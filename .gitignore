@@ -1,0 +1,28 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Backend (Maven / Java)
+backend/target/
+*.class
+*.log
+hs_err_pid*
+
+# Frontend (Node / Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+npm-debug.log*
+
+# IDEs and OS files
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Smoke test output
+scripts/*.log
+scripts/*.log.err

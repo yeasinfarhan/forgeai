@@ -1,0 +1,53 @@
+# ForgeAI local stack: PostgreSQL + backend API + frontend (nginx).
+#
+#   docker compose up -d postgres     # database only (for local backend/frontend development)
+#   docker compose up --build         # full stack
+#
+# Values come from the .env file next to this file (copy .env.example to .env).
+
+name: forgeai
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-forgeai}
+      POSTGRES_USER: ${DATABASE_USERNAME:-forgeai}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Inside the Compose network the database host is the service name, not localhost.
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-forgeai}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-forgeai}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+volumes:
+  postgres-data:

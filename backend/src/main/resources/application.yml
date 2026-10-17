@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: forgeai-backend
+
+  # Settings are read from environment variables. For local development the
+  # project-root .env file is also loaded (when present), so the backend and
+  # docker-compose.yml share one source of configuration. Real environment
+  # variables always take precedence over values in .env.
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/forgeai}
+    username: ${DATABASE_USERNAME:forgeai}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      pool-name: forgeai-pool
+      maximum-pool-size: ${DATABASE_POOL_SIZE:10}
+      connection-timeout: 10000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # No schema yet. Schema management (Flyway migrations) arrives in Phase 2.
+      ddl-auto: none
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-stacktrace: never
+    include-message: never
+
+logging:
+  level:
+    com.forgeai: ${FORGEAI_LOG_LEVEL:INFO}
