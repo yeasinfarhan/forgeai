@@ -1,6 +1,7 @@
-import { Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { useMatches } from "react-router";
 
+import { useAuth } from "@/auth/auth-context";
 import { ApiStatusIndicator } from "@/components/api-status-indicator";
 import { Button } from "@/components/ui/button";
 import type { HealthCheck } from "@/hooks/use-health-check";
@@ -15,6 +16,7 @@ interface HeaderProps {
 }
 
 export function Header({ health, onOpenNavigation }: HeaderProps) {
+  const { user, logout } = useAuth();
   const matches = useMatches();
   const title =
     matches
@@ -34,8 +36,27 @@ export function Header({ health, onOpenNavigation }: HeaderProps) {
         <span className="truncate font-medium">{title}</span>
       </nav>
 
-      <div className="ml-auto">
-        <ApiStatusIndicator state={health.state} />
+      <div className="ml-auto flex items-center gap-3">
+        <span className="hidden sm:inline-flex">
+          <ApiStatusIndicator state={health.state} />
+        </span>
+        {user && (
+          <div className="flex items-center gap-2 border-l pl-3">
+            <span
+              aria-hidden="true"
+              className="grid size-7 place-items-center rounded-full bg-primary/15 text-xs font-semibold text-primary"
+            >
+              {user.displayName.trim().charAt(0).toUpperCase()}
+            </span>
+            <div className="hidden min-w-0 leading-tight md:block">
+              <p className="truncate text-sm font-medium">{user.displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={logout} aria-label="Sign out" title="Sign out">
+              <LogOut />
+            </Button>
+          </div>
+        )}
       </div>
     </header>
   );

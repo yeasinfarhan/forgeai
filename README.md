@@ -11,9 +11,8 @@ Idea → Requirements → Architecture → Database Design → API Design
 Claude acts as the reasoning engine. The application itself owns everything around it: projects,
 persistent context, approvals, tasks, generated artifacts and the development workflow.
 
-> **Status: Phase 1 — Foundation.** This repository currently contains the project skeleton: a Spring Boot
-> API with a health check and PostgreSQL connectivity, and a React application shell. The product
-> features are planned in [`docs/development-plan.md`](docs/development-plan.md).
+> **Status: Phase 2 — Accounts & projects.** Users can register, sign in and manage their projects.
+> AI-driven stages are planned in [`docs/development-plan.md`](docs/development-plan.md).
 
 ---
 
@@ -35,15 +34,22 @@ forgeai/
 │   ├── src/main/java/com/forgeai/
 │   │   ├── ForgeAiApplication.java
 │   │   ├── common/exception/    Global exception handling (RFC 9457 problem details)
-│   │   ├── config/              Security and startup database verification
-│   │   └── health/              GET /api/health
-│   ├── src/main/resources/application.yml
-│   ├── src/test/java/...        Web-layer tests
+│   │   ├── auth/                Registration, login, JWT issuing
+│   │   ├── common/security/     Current-user helper
+│   │   ├── config/              Security, JWT settings, startup database check
+│   │   ├── health/              GET /api/health
+│   │   ├── project/             Project CRUD
+│   │   └── user/                User entity and repository
+│   ├── src/main/resources/
+│   │   ├── application.yml
+│   │   └── db/migration/        Flyway SQL migrations
+│   ├── src/test/java/...        Web-layer and Testcontainers integration tests
 │   ├── Dockerfile
 │   └── pom.xml
 ├── frontend/                    React + Vite application
 │   ├── src/
-│   │   ├── components/layout/   App shell: sidebar, header, layout
+│   │   ├── auth/                Session state, route guard
+│   │   ├── components/layout/   App shell: sidebar, header, layouts
 │   │   ├── components/ui/       shadcn/ui components
 │   │   ├── hooks/               React hooks (API health polling)
 │   │   ├── lib/                 API client and utilities
@@ -78,7 +84,14 @@ All configuration lives in a single `.env` file at the project root.
 cp .env.example .env          # Windows PowerShell: Copy-Item .env.example .env
 ```
 
-Then edit `.env` and set at least `DATABASE_PASSWORD`.
+Then edit `.env` and set `DATABASE_PASSWORD` and `JWT_SECRET`. Generate a secret with:
+
+```powershell
+[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))   # PowerShell
+```
+```bash
+openssl rand -base64 48                                                                  # bash
+```
 
 | Variable            | Purpose                                                  | Used from |
 | ------------------- | -------------------------------------------------------- | --------- |
@@ -86,7 +99,8 @@ Then edit `.env` and set at least `DATABASE_PASSWORD`.
 | `DATABASE_USERNAME` | Database user                                            | Phase 1   |
 | `DATABASE_PASSWORD` | Database password (required)                             | Phase 1   |
 | `CLAUDE_API_KEY`    | Claude API key                                           | Phase 3   |
-| `JWT_SECRET`        | Secret used to sign authentication tokens                | Phase 2   |
+| `JWT_SECRET`        | Secret for signing access tokens — **required**, 32+ chars | Phase 2   |
+| `JWT_EXPIRATION`    | Access-token lifetime (ISO-8601, default `PT8H`)         | Phase 2   |
 
 The backend reads the root `.env` automatically when started from `backend/` or the project root.
 Real environment variables always override values in `.env`. **Never commit `.env`** — it is git-ignored.
@@ -127,12 +141,19 @@ Run the tests:
 mvn test
 ```
 
-No Java or Maven installed? Run the tests in a container instead (from the project root):
+No Java or Maven installed? Run the tests in a container instead (from the project root). The Docker
+socket is mounted so the integration tests can start their own PostgreSQL with Testcontainers:
 
 ```bash
-docker run --rm -v "${PWD}/backend":/workspace -w /workspace maven:3.9-eclipse-temurin-25 mvn -B test   # PowerShell / bash
-docker run --rm -v "%cd%\backend":/workspace -w /workspace maven:3.9-eclipse-temurin-25 mvn -B test   # cmd
+# PowerShell / bash
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal -v forgeai-m2:/root/.m2 -v "${PWD}/backend":/workspace -w /workspace maven:3.9-eclipse-temurin-25 mvn -B test
 ```
+```cmd
+:: cmd
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal -v forgeai-m2:/root/.m2 -v "%cd%\backend":/workspace -w /workspace maven:3.9-eclipse-temurin-25 mvn -B test
+```
+
+Integration tests (`*IntegrationTest`) need Docker running; they use a throwaway `postgres:17-alpine` container.
 
 Build a runnable jar:
 
@@ -184,8 +205,31 @@ curl http://localhost:8080/api/health
 }
 ```
 
-Every other endpoint currently requires authentication and returns `401 Unauthorized`. Errors use
-the RFC 9457 `application/problem+json` format.
+## API overview
+
+| Method | Path                    | Auth | Description                                   |
+| ------ | ----------------------- | ---- | --------------------------------------------- |
+| GET    | `/api/health`           | —    | Service health                                |
+| POST   | `/api/auth/register`    | —    | Create an account → `201` + access token      |
+| POST   | `/api/auth/login`       | —    | Sign in → access token                        |
+| GET    | `/api/auth/me`          | ✓    | The signed-in user                            |
+| GET    | `/api/projects`         | ✓    | Your projects, most recently updated first    |
+| POST   | `/api/projects`         | ✓    | Create a project → `201` + `Location` header  |
+| GET    | `/api/projects/{id}`    | ✓    | One project                                   |
+| PUT    | `/api/projects/{id}`    | ✓    | Update name / description                     |
+| DELETE | `/api/projects/{id}`    | ✓    | Delete → `204`                                |
+
+Authenticated endpoints expect `Authorization: Bearer <accessToken>`. Missing or invalid tokens get
+`401`. Another user's project returns `404`, so its existence is never revealed. Errors use the
+RFC 9457 `application/problem+json` format.
+
+Example:
+
+```bash
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"ada@example.com","password":"correct-horse","displayName":"Ada"}'
+```
 
 ## Documentation
 

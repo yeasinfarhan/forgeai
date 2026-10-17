@@ -23,8 +23,20 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      # No schema yet. Schema management (Flyway migrations) arrives in Phase 2.
-      ddl-auto: none
+      # Flyway owns the schema (src/main/resources/db/migration).
+      # Hibernate only checks that the entity mappings match it.
+      ddl-auto: validate
+
+  flyway:
+    locations: classpath:db/migration
+
+forgeai:
+  security:
+    jwt:
+      # HMAC key for signing access tokens. Must be at least 32 bytes.
+      secret: ${JWT_SECRET:}
+      # ISO-8601 duration, e.g. PT8H = 8 hours.
+      expiration: ${JWT_EXPIRATION:PT8H}
 
 server:
   port: ${SERVER_PORT:8080}

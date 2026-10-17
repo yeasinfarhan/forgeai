@@ -6,7 +6,7 @@ only when the previous one is complete and reviewed.
 | Phase | Name                                   | Status      |
 | ----- | -------------------------------------- | ----------- |
 | 1     | Foundation                             | Complete    |
-| 2     | Authentication & projects              | Planned     |
+| 2     | Authentication & projects              | Complete    |
 | 3     | AI module & idea intake                | Planned     |
 | 4     | Requirements                           | Planned     |
 | 5     | Architecture                           | Planned     |
@@ -29,9 +29,11 @@ only when the previous one is complete and reviewed.
 - React + TypeScript + Vite + Tailwind + shadcn/ui application shell with live API status.
 - Docker Compose for PostgreSQL, backend and frontend.
 
-## Phase 2 — Authentication & projects
+## Phase 2 — Authentication & projects ✅
 
 Goal: users can sign in and manage projects, the container for all later work.
+
+Delivered:
 
 - Flyway migrations; first schema: `users`, `projects`.
 - Registration and login with BCrypt password hashing; stateless JWT access tokens (`JWT_SECRET`).

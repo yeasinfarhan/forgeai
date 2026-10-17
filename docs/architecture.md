@@ -1,6 +1,6 @@
 # ForgeAI Architecture
 
-This document describes how ForgeAI is structured today (Phase 1) and the rules that keep it
+This document describes how ForgeAI is structured today (Phase 2) and the rules that keep it
 maintainable as later phases add features.
 
 ## System overview
@@ -55,11 +55,14 @@ Packages are organised **by feature**, with shared infrastructure separated:
 com.forgeai
 ├── ForgeAiApplication
 ├── common/          Cross-cutting code shared by all features
-│   └── exception/   GlobalExceptionHandler, ResourceNotFoundException
-├── config/          Spring configuration (security, startup checks)
+│   ├── exception/   GlobalExceptionHandler, ResourceNotFoundException
+│   └── security/    CurrentUser (reads the user id from the access token)
+├── config/          SecurityConfig, JwtProperties, DatabaseConnectionVerifier
+├── auth/            AuthController, AuthService, JwtTokenService, request/response DTOs
+├── user/            User entity, UserRepository, UserResponse
+├── project/         Project entity, repository, service, controller, DTOs
 ├── health/          Health check feature
-└── (future)         project/, requirement/, ai/, ... — one package per feature,
-                     each with its own controller, service, repository, entity and dto types
+└── (future)         requirement/, ai/, ... — one package per feature
 ```
 
 ### Error handling
@@ -79,11 +82,19 @@ Stack traces and internal messages are never sent to clients.
 
 ### Security
 
-Phase 1 sets a secure baseline:
-
-- Stateless sessions, no form login or HTTP Basic.
-- `GET /api/health` is public; every other route requires authentication (none can be obtained yet).
-- JWT-based authentication arrives in Phase 2.
+- **Stateless:** no server sessions, cookies, form login or HTTP Basic, so CSRF does not apply.
+- **Public routes:** `GET /api/health`, `POST /api/auth/register`, `POST /api/auth/login`. Everything
+  else needs `Authorization: Bearer <token>`.
+- **Passwords:** hashed with BCrypt. Passwords over 72 bytes (BCrypt's limit) are rejected, not
+  silently truncated. Login compares against a dummy hash for unknown emails so response time does
+  not reveal whether an account exists, and the error never says which field was wrong.
+- **Tokens:** HS256-signed JWTs issued by `JwtTokenService` with Spring Security's Nimbus encoder.
+  Claims: `iss=forgeai`, `sub=<user id>`, `iat`, `exp`, `email`. Validated by Spring Security's
+  OAuth2 resource server (signature, expiry, issuer). Lifetime is `JWT_EXPIRATION` (default 8 h).
+- **Secret:** `JWT_SECRET` is required and must be at least 32 bytes; the app refuses to start otherwise.
+- **Ownership:** every project query is scoped by owner id. Another user's project returns `404`
+  rather than `403`, so its existence is not disclosed.
+- **Not yet:** refresh tokens, token revocation, rate limiting on login (planned for hardening).
 
 ### Configuration
 
@@ -91,11 +102,24 @@ All environment-specific values come from environment variables (see `.env.examp
 backend also imports the project-root `.env` for local development; real environment variables
 take precedence. No secrets are stored in the repository.
 
-### Database connectivity
+### Database and migrations
 
-`DatabaseConnectionVerifier` opens a connection at startup and logs the database product and
-version. If PostgreSQL is unreachable the application fails fast. Hibernate's `ddl-auto` is `none`;
-schema changes will be managed by versioned migrations (Flyway) from Phase 2.
+Flyway owns the schema: versioned SQL files in `src/main/resources/db/migration` run on startup.
+Hibernate runs with `ddl-auto: validate`, so the app refuses to start if an entity no longer
+matches the schema. Never edit an applied migration; add a new `V<n>__description.sql` instead.
+
+| Table      | Purpose                                                       |
+| ---------- | ------------------------------------------------------------- |
+| `users`    | Accounts. Email is stored lower-cased and is unique.          |
+| `projects` | Owned by a user (`owner_id`, cascade on delete); name + description. |
+
+`DatabaseConnectionVerifier` also logs the database product and version at startup.
+
+### Testing
+
+- **Web-layer tests** (`@WebMvcTest`): controllers, security rules and error mapping, no database.
+- **Integration tests** (`*IntegrationTest`): the full app over HTTP (MockMvc) against a real
+  PostgreSQL started by Testcontainers, with the real Flyway migrations.
 
 ## Frontend
 
@@ -117,6 +141,9 @@ src/
   nginx (Docker) proxy them to the backend, so no backend URL is hardcoded and no CORS is needed.
 - **Styling:** Tailwind CSS 4 with shadcn/ui design tokens defined as CSS variables in `index.css`.
 - **Navigation:** only implemented routes appear in the sidebar.
+- **Auth:** `AuthProvider` keeps the session (token, expiry, user) in `localStorage`, confirms it
+  with `/api/auth/me` on load, signs out on any `401` or when the token expires. `RequireAuth`
+  guards the app routes and sends anonymous users to `/login`, returning them afterwards.
 
 ## Deployment (Docker Compose)
 

@@ -1,11 +1,15 @@
 import type { ReactNode } from "react";
-import { Activity, RefreshCw, Server, Timer, type LucideIcon } from "lucide-react";
+import { Activity, ArrowRight, Plus, RefreshCw, Server, Timer, type LucideIcon } from "lucide-react";
+import { Link } from "react-router";
 
 import { useAppLayoutContext } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/auth/auth-context";
 import type { HealthCheck } from "@/hooks/use-health-check";
+import { useProjects } from "@/hooks/use-projects";
+import { formatRelative } from "@/lib/format";
 
 const PIPELINE_STAGES = [
   { name: "Idea", detail: "Capture the product idea in natural language" },
@@ -22,15 +26,17 @@ const PIPELINE_STAGES = [
 
 export function DashboardPage() {
   const { health } = useAppLayoutContext();
+  const { user } = useAuth();
 
   return (
     <div className="space-y-8">
       <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {user ? `Welcome, ${user.displayName}` : "Dashboard"}
+          </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            ForgeAI turns a software idea into requirements, architecture, code, tests and documentation. This
-            workspace is in its foundation phase.
+            ForgeAI turns a software idea into requirements, architecture, code, tests and documentation.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={health.refresh} disabled={health.isRefreshing}>
@@ -40,6 +46,8 @@ export function DashboardPage() {
       </section>
 
       <SystemStatus health={health} />
+
+      <RecentProjects />
 
       <Card>
         <CardHeader>
@@ -64,6 +72,69 @@ export function DashboardPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+const RECENT_PROJECT_COUNT = 5;
+
+function RecentProjects() {
+  const { state, reload } = useProjects();
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <CardTitle>Recent projects</CardTitle>
+          <CardDescription>Your most recently updated projects.</CardDescription>
+        </div>
+        <Button asChild variant="ghost" size="sm">
+          <Link to="/projects">
+            View all
+            <ArrowRight />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {state.kind === "loading" && <div aria-hidden="true" className="h-24 animate-pulse rounded-lg bg-muted" />}
+
+        {state.kind === "error" && (
+          <div role="alert" className="flex items-center justify-between gap-3 text-sm text-destructive">
+            {state.message}
+            <Button variant="outline" size="sm" onClick={reload}>
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {state.kind === "loaded" && state.projects.length === 0 && (
+          <div className="flex flex-col items-start gap-3 text-sm text-muted-foreground">
+            You have no projects yet.
+            <Button asChild size="sm">
+              <Link to="/projects/new">
+                <Plus />
+                New project
+              </Link>
+            </Button>
+          </div>
+        )}
+
+        {state.kind === "loaded" && state.projects.length > 0 && (
+          <ul className="divide-y rounded-lg border">
+            {state.projects.slice(0, RECENT_PROJECT_COUNT).map((project) => (
+              <li key={project.id}>
+                <Link
+                  to={`/projects/${project.id}`}
+                  className="flex items-center justify-between gap-4 px-4 py-3 text-sm transition-colors hover:bg-accent/50"
+                >
+                  <span className="truncate font-medium">{project.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{formatRelative(project.updatedAt)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

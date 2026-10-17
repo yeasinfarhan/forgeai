@@ -37,7 +37,8 @@ services:
       DATABASE_USERNAME: ${DATABASE_USERNAME:-forgeai}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
-      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-PT8H}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
 

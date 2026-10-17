@@ -1,4 +1,4 @@
-import { LayoutDashboard, type LucideIcon } from "lucide-react";
+import { FolderKanban, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router";
 
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -8,10 +8,15 @@ interface NavItem {
   label: string;
   to: string;
   icon: LucideIcon;
+  /** Only highlight on an exact match (the dashboard would otherwise match every route). */
+  end?: boolean;
 }
 
 // Only routes that exist are listed. New sections are added as their phases ship.
-const NAV_ITEMS: NavItem[] = [{ label: "Dashboard", to: "/", icon: LayoutDashboard }];
+const NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", to: "/", icon: LayoutDashboard, end: true },
+  { label: "Projects", to: "/projects", icon: FolderKanban },
+];
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -48,11 +53,11 @@ export function Sidebar({ isMobileOpen, onNavigate }: SidebarProps) {
               Workspace
             </p>
             <ul className="space-y-0.5">
-              {NAV_ITEMS.map(({ label, to, icon: Icon }) => (
+              {NAV_ITEMS.map(({ label, to, icon: Icon, end }) => (
                 <li key={to}>
                   <NavLink
                     to={to}
-                    end
+                    end={end}
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
@@ -73,8 +78,8 @@ export function Sidebar({ isMobileOpen, onNavigate }: SidebarProps) {
         </nav>
 
         <div className="border-t border-sidebar-border px-5 py-4">
-          <p className="text-xs font-medium">Phase 1 · Foundation</p>
-          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">v0.1.0</p>
+          <p className="text-xs font-medium">Phase 2 · Accounts & projects</p>
+          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">v0.2.0</p>
         </div>
       </aside>
     </>
