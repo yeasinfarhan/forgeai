@@ -7,7 +7,7 @@ only when the previous one is complete and reviewed.
 | ----- | -------------------------------------- | ----------- |
 | 1     | Foundation                             | Complete    |
 | 2     | Authentication & projects              | Complete    |
-| 3     | AI module & idea intake                | Planned     |
+| 3     | AI module & idea intake                | Implemented |
 | 4     | Requirements                           | Planned     |
 | 5     | Architecture                           | Planned     |
 | 6     | Database & API design                  | Planned     |
@@ -45,12 +45,18 @@ Delivered:
 
 Goal: a reliable, isolated integration with Claude and the first pipeline stage.
 
+Delivered:
+
 - `com.forgeai.ai` module: Claude API client, configuration (`CLAUDE_API_KEY`), timeouts, retries,
   error mapping, token/usage logging.
 - Prompt templates stored in versioned resources, not inline strings.
-- Structured outputs validated against schemas before they are persisted.
-- Idea intake: the user describes the idea; Claude asks clarifying questions; the idea brief is saved.
-- Persistent project context that every later stage builds on.
+- Structured outputs (JSON schema via `output_config.format`) validated again in code before they
+  are persisted.
+- Idea intake: the user describes the idea; Claude asks up to 3 rounds of clarifying questions
+  (or the user skips ahead); the structured project brief is saved.
+- Persistent project context that every later stage builds on (idea, Q&A rounds, brief).
+- Usage is logged per call (tokens, duration, attempts); persisting usage for cost reporting is
+  left for Phase 11.
 
 ## Phase 4 — Requirements
 

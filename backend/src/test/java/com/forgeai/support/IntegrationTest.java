@@ -52,6 +52,17 @@ public abstract class IntegrationTest {
         return JsonPath.read(response, "$.accessToken");
     }
 
+    /** Creates a project for the user and returns its id. */
+    protected String createProject(String token, String name) throws Exception {
+        String response = mockMvc.perform(post("/api/projects")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"%s\"}".formatted(name)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(response, "$.id");
+    }
+
     protected static String bearer(String token) {
         return "Bearer " + token;
     }

@@ -38,6 +38,23 @@ forgeai:
       # ISO-8601 duration, e.g. PT8H = 8 hours.
       expiration: ${JWT_EXPIRATION:PT8H}
 
+  ai:
+    # Which model provider answers AI requests: claude (default) or gemini.
+    # Without the selected provider's API key the app runs normally; AI features report "not configured".
+    provider: ${AI_PROVIDER:claude}
+    # Upper bound for one response, including the model's thinking.
+    max-tokens: ${AI_MAX_TOKENS:16000}
+    timeout: ${AI_TIMEOUT:PT120S}
+    max-retries: ${AI_MAX_RETRIES:2}
+    claude:
+      api-key: ${CLAUDE_API_KEY:}
+      model: ${CLAUDE_MODEL:claude-sonnet-5-5}
+      base-url: ${CLAUDE_BASE_URL:https://api.anthropic.com}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.8-flash}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+
 server:
   port: ${SERVER_PORT:8080}
   error:

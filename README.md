@@ -11,8 +11,9 @@ Idea → Requirements → Architecture → Database Design → API Design
 Claude acts as the reasoning engine. The application itself owns everything around it: projects,
 persistent context, approvals, tasks, generated artifacts and the development workflow.
 
-> **Status: Phase 2 — Accounts & projects.** Users can register, sign in and manage their projects.
-> AI-driven stages are planned in [`docs/development-plan.md`](docs/development-plan.md).
+> **Status: Phase 3 — AI idea intake.** Users register, manage projects, and turn an idea into a
+> structured project brief with Claude. Later stages are planned in
+> [`docs/development-plan.md`](docs/development-plan.md).
 
 ---
 
@@ -34,21 +35,25 @@ forgeai/
 │   ├── src/main/java/com/forgeai/
 │   │   ├── ForgeAiApplication.java
 │   │   ├── common/exception/    Global exception handling (RFC 9457 problem details)
+│   │   ├── ai/                  AI clients (Claude, Gemini), prompt templates, AI errors
 │   │   ├── auth/                Registration, login, JWT issuing
 │   │   ├── common/security/     Current-user helper
 │   │   ├── config/              Security, JWT settings, startup database check
 │   │   ├── health/              GET /api/health
+│   │   ├── intake/              Idea intake: questions, answers, project brief
 │   │   ├── project/             Project CRUD
 │   │   └── user/                User entity and repository
 │   ├── src/main/resources/
 │   │   ├── application.yml
-│   │   └── db/migration/        Flyway SQL migrations
+│   │   ├── db/migration/        Flyway SQL migrations
+│   │   └── prompts/             Prompt templates (Markdown)
 │   ├── src/test/java/...        Web-layer and Testcontainers integration tests
 │   ├── Dockerfile
 │   └── pom.xml
 ├── frontend/                    React + Vite application
 │   ├── src/
 │   │   ├── auth/                Session state, route guard
+│   │   ├── components/intake/   Idea intake panel, brief view
 │   │   ├── components/layout/   App shell: sidebar, header, layouts
 │   │   ├── components/ui/       shadcn/ui components
 │   │   ├── hooks/               React hooks (API health polling)
@@ -98,7 +103,11 @@ openssl rand -base64 48                                                         
 | `DATABASE_URL`      | JDBC URL, e.g. `jdbc:postgresql://localhost:5432/forgeai` | Phase 1   |
 | `DATABASE_USERNAME` | Database user                                            | Phase 1   |
 | `DATABASE_PASSWORD` | Database password (required)                             | Phase 1   |
-| `CLAUDE_API_KEY`    | Claude API key                                           | Phase 3   |
+| `CLAUDE_API_KEY`    | Claude API key (optional; AI features need it)           | Phase 3   |
+| `CLAUDE_MODEL`      | Model for AI features (default `claude-sonnet-5-5`)      | Phase 3   |
+| `AI_PROVIDER`       | `claude` (default) or `gemini`                           | Phase 3   |
+| `GEMINI_API_KEY`    | Google Gemini API key (when `AI_PROVIDER=gemini`)        | Phase 3   |
+| `GEMINI_MODEL`      | Gemini model (default `gemini-3.8-flash`)                | Phase 3   |
 | `JWT_SECRET`        | Secret for signing access tokens — **required**, 32+ chars | Phase 2   |
 | `JWT_EXPIRATION`    | Access-token lifetime (ISO-8601, default `PT8H`)         | Phase 2   |
 
@@ -218,6 +227,13 @@ curl http://localhost:8080/api/health
 | GET    | `/api/projects/{id}`    | ✓    | One project                                   |
 | PUT    | `/api/projects/{id}`    | ✓    | Update name / description                     |
 | DELETE | `/api/projects/{id}`    | ✓    | Delete → `204`                                |
+| GET    | `/api/projects/{id}/intake`         | ✓ | Idea intake state (questions, answers, brief) |
+| POST   | `/api/projects/{id}/intake`         | ✓ | Start / restart with `{"idea": "…"}`           |
+| POST   | `/api/projects/{id}/intake/answers` | ✓ | Answer the current round of questions          |
+| POST   | `/api/projects/{id}/intake/brief`   | ✓ | Write (or rewrite) the brief now               |
+
+Intake endpoints call Claude and can take up to a minute. AI failures return a problem detail with
+a `reason` (`NOT_CONFIGURED`, `RATE_LIMITED`, `TIMEOUT`, …) and a message safe to show users.
 
 Authenticated endpoints expect `Authorization: Bearer <accessToken>`. Missing or invalid tokens get
 `401`. Another user's project returns `404`, so its existence is never revealed. Errors use the
@@ -230,6 +246,20 @@ curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"ada@example.com","password":"correct-horse","displayName":"Ada"}'
 ```
+
+## Using AI features
+
+1. Choose a provider in `.env`:
+   - **Claude** (default, paid): key from https://console.anthropic.com → `CLAUDE_API_KEY`.
+   - **Gemini** (free tier for Flash models): key from https://aistudio.google.com →
+     `GEMINI_API_KEY`, and set `AI_PROVIDER=gemini`. On the free tier Google may use prompts and
+     responses to improve its products, so don't send confidential ideas.
+2. Restart the backend (`docker compose up -d --build backend`).
+3. Open a project and use **Idea intake**: describe the idea, answer Claude's questions, read the brief.
+
+Without a key everything else works; the intake panel explains that AI is not configured.
+Each AI call is logged with its token usage (`AI call provider=… purpose=… inputTokens=… outputTokens=…`).
+Tests never call a real AI provider: it is mocked, so `mvn test` needs no key and costs nothing.
 
 ## Documentation
 

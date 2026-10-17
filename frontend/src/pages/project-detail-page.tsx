@@ -3,6 +3,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { FormError } from "@/components/form-field";
+import { IdeaIntakePanel } from "@/components/intake/idea-intake-panel";
 import { ProjectForm } from "@/components/project-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -167,6 +168,8 @@ function ProjectDetail({ project, onUpdated }: { project: Project; onUpdated: (p
           )}
         </CardContent>
       </Card>
+
+      <IdeaIntakePanel project={project} />
     </>
   );
 }

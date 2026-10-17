@@ -175,3 +175,67 @@ export function updateProject(id: string, input: ProjectInput): Promise<Project>
 export function deleteProject(id: string): Promise<void> {
   return apiRequest<void>(`/api/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
+
+// --- Idea intake -------------------------------------------------------------
+
+export type IntakeStatus = "NOT_STARTED" | "AWAITING_ANSWERS" | "BRIEF_READY";
+
+export interface IntakeQuestion {
+  id: string;
+  question: string;
+  rationale: string;
+  answer: string | null;
+}
+
+export interface IntakeRound {
+  number: number;
+  questions: IntakeQuestion[];
+}
+
+export interface ProjectBrief {
+  title: string;
+  summary: string;
+  problem: string;
+  targetUsers: string[];
+  goals: string[];
+  coreFeatures: { name: string; description: string }[];
+  outOfScope: string[];
+  constraints: string[];
+  openQuestions: string[];
+}
+
+export interface Intake {
+  status: IntakeStatus;
+  idea: string | null;
+  currentRound: number | null;
+  maxQuestionRounds: number;
+  rounds: IntakeRound[];
+  brief: ProjectBrief | null;
+  briefModel: string | null;
+  updatedAt: string | null;
+}
+
+export interface IntakeAnswer {
+  questionId: string;
+  answer: string;
+}
+
+function intakePath(projectId: string, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/intake${suffix}`;
+}
+
+export function getIntake(projectId: string, signal?: AbortSignal): Promise<Intake> {
+  return apiRequest<Intake>(intakePath(projectId), { signal });
+}
+
+export function startIntake(projectId: string, idea: string): Promise<Intake> {
+  return apiRequest<Intake>(intakePath(projectId), { method: "POST", body: { idea } });
+}
+
+export function answerIntake(projectId: string, answers: IntakeAnswer[]): Promise<Intake> {
+  return apiRequest<Intake>(intakePath(projectId, "/answers"), { method: "POST", body: { answers } });
+}
+
+export function writeIntakeBrief(projectId: string, answers: IntakeAnswer[] = []): Promise<Intake> {
+  return apiRequest<Intake>(intakePath(projectId, "/brief"), { method: "POST", body: { answers } });
+}

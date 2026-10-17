@@ -17,8 +17,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.forgeai.ai.AiException;
 import com.forgeai.auth.EmailAlreadyRegisteredException;
 import com.forgeai.auth.InvalidCredentialsException;
+import com.forgeai.intake.IntakeStateException;
 
 /**
  * Translates exceptions into RFC 9457 problem details so every API error has the same shape.
@@ -74,6 +76,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
         problem.setTitle("Invalid credentials");
+        return problem;
+    }
+
+    @ExceptionHandler(IntakeStateException.class)
+    ProblemDetail handleIntakeState(IntakeStateException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Intake conflict");
+        return problem;
+    }
+
+    /** AI failures: technical detail goes to the log, a safe explanation goes to the client. */
+    @ExceptionHandler(AiException.class)
+    ProblemDetail handleAi(AiException ex) {
+        log.warn("AI call failed ({}): {}", ex.failure(), ex.getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.failure().httpStatus(), ex.failure().userMessage());
+        problem.setTitle("AI service error");
+        problem.setProperty("reason", ex.failure().name());
         return problem;
     }
 

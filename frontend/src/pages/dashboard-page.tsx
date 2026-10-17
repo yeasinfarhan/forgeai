@@ -11,8 +11,8 @@ import type { HealthCheck } from "@/hooks/use-health-check";
 import { useProjects } from "@/hooks/use-projects";
 import { formatRelative } from "@/lib/format";
 
-const PIPELINE_STAGES = [
-  { name: "Idea", detail: "Capture the product idea in natural language" },
+const PIPELINE_STAGES: { name: string; detail: string; available?: boolean }[] = [
+  { name: "Idea", detail: "Describe the idea; Claude clarifies it and writes a brief", available: true },
   { name: "Requirements", detail: "Functional and non-functional requirements" },
   { name: "Architecture", detail: "System components and their boundaries" },
   { name: "Database design", detail: "Entities, relations and migrations" },
@@ -22,7 +22,7 @@ const PIPELINE_STAGES = [
   { name: "Tests", detail: "Unit and integration test suites" },
   { name: "Code review", detail: "Automated review against the design" },
   { name: "Documentation", detail: "Developer and user-facing docs" },
-] as const;
+];
 
 export function DashboardPage() {
   const { health } = useAppLayoutContext();
@@ -53,7 +53,7 @@ export function DashboardPage() {
         <CardHeader>
           <CardTitle>Delivery pipeline</CardTitle>
           <CardDescription>
-            The stages ForgeAI will guide a project through. Each stage is delivered in an upcoming phase.
+            The stages ForgeAI guides a project through. Idea intake is available on every project page.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -62,7 +62,11 @@ export function DashboardPage() {
               <li key={stage.name} className="flex flex-col gap-2 bg-card p-4">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
-                  <Badge variant="outline">Planned</Badge>
+                  {stage.available ? (
+                    <Badge variant="success">Available</Badge>
+                  ) : (
+                    <Badge variant="outline">Planned</Badge>
+                  )}
                 </div>
                 <p className="text-sm font-medium">{stage.name}</p>
                 <p className="text-xs leading-relaxed text-muted-foreground">{stage.detail}</p>

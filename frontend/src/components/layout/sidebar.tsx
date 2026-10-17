@@ -78,8 +78,8 @@ export function Sidebar({ isMobileOpen, onNavigate }: SidebarProps) {
         </nav>
 
         <div className="border-t border-sidebar-border px-5 py-4">
-          <p className="text-xs font-medium">Phase 2 · Accounts & projects</p>
-          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">v0.2.0</p>
+          <p className="text-xs font-medium">Phase 3 · AI idea intake</p>
+          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">v0.3.0</p>
         </div>
       </aside>
     </>

@@ -134,14 +134,4 @@ class ProjectApiIntegrationTest extends IntegrationTest {
     void requiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/projects")).andExpect(status().isUnauthorized());
     }
-
-    private String createProject(String token, String name) throws Exception {
-        String response = mockMvc.perform(post("/api/projects")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\": \"%s\"}".formatted(name)))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(response, "$.id");
-    }
 }

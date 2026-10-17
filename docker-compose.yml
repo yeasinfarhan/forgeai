@@ -36,7 +36,11 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-forgeai}
       DATABASE_USERNAME: ${DATABASE_USERNAME:-forgeai}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      AI_PROVIDER: ${AI_PROVIDER:-claude}
       CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-5-5}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-PT8H}
     ports:

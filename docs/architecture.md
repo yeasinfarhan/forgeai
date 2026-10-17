@@ -1,6 +1,6 @@
 # ForgeAI Architecture
 
-This document describes how ForgeAI is structured today (Phase 2) and the rules that keep it
+This document describes how ForgeAI is structured today (Phase 3) and the rules that keep it
 maintainable as later phases add features.
 
 ## System overview
@@ -61,8 +61,10 @@ com.forgeai
 ├── auth/            AuthController, AuthService, JwtTokenService, request/response DTOs
 ├── user/            User entity, UserRepository, UserResponse
 ├── project/         Project entity, repository, service, controller, DTOs
+├── ai/              AiClient (Claude/Gemini), PromptTemplates, AiProperties, AiException/AiFailure
+├── intake/          Idea intake: entities, IntakeStore, IdeaIntakeAssistant, service, controller
 ├── health/          Health check feature
-└── (future)         requirement/, ai/, ... — one package per feature
+└── (future)         requirement/, architecture/, ... — one package per feature
 ```
 
 ### Error handling
@@ -95,6 +97,56 @@ Stack traces and internal messages are never sent to clients.
 - **Ownership:** every project query is scoped by owner id. Another user's project returns `404`
   rather than `403`, so its existence is not disclosed.
 - **Not yet:** refresh tokens, token revocation, rate limiting on login (planned for hardening).
+
+### AI module (`com.forgeai.ai`)
+
+```
+Feature service (e.g. IdeaIntakeService)
+   └─ feature assistant (IdeaIntakeAssistant): builds prompts, JSON schema, validates output
+        └─ AiClient (interface) ── chosen by AI_PROVIDER
+             ├─ ClaudeClient → Claude Messages API (POST /v1/messages, output_config.format)
+             └─ GeminiClient → Gemini generateContent (responseMimeType + responseSchema)
+             (both extend HttpAiClient: not-configured check, retries, timeouts, usage logging)
+```
+
+- **One door to the model.** Features depend only on `AiClient`. They pass an `AiRequest`
+  (purpose, system prompt, user message, optional JSON schema) and get an `AiResult`.
+  `AI_PROVIDER` selects the implementation; Claude is the default and Gemini is an optional,
+  free-tier-friendly alternative. `GeminiSchemas` converts the shared JSON Schemas to Gemini's
+  `responseSchema` format (upper-case types, `nullable` instead of `anyOf` with null).
+- **Structured outputs.** Responses that the app stores are requested with
+  `output_config.format = {type: json_schema, schema}`, so Claude must return JSON matching the
+  schema. The assistant still validates the parsed result (e.g. "at most five questions"),
+  because the schema subset cannot express every rule. Forced tool use is not used: current
+  models reject it.
+- **Prompts are files.** `src/main/resources/prompts/*.md`, rendered by `PromptTemplates` with
+  `{{placeholder}}` values in a single pass, so user text cannot inject new placeholders. User
+  content is wrapped in tags and the system prompt tells Claude to treat it as data.
+- **Reliability.** 429, 529 and 5xx are retried with exponential backoff (honouring
+  `Retry-After`, capped at 20 s, `CLAUDE_MAX_RETRIES` attempts). Connection failures are retried;
+  read timeouts (`CLAUDE_TIMEOUT`, default 120 s) are not. `refusal` and `max_tokens` stop
+  reasons are reported as failures rather than parsed.
+- **Errors.** `AiException` carries an `AiFailure` (HTTP status + user-safe message). Technical
+  detail is logged, never returned. No API key → `503 NOT_CONFIGURED`; the rest of the app runs.
+- **Usage.** Every call logs purpose, model, input/output tokens, duration and attempts.
+- **No DB transaction during AI calls.** `IdeaIntakeService` reads state, calls Claude, then
+  writes through `IntakeStore` in a short transaction with an optimistic version check
+  (`idea_intakes.version`), so a slow call never holds a connection and two tabs cannot both
+  apply an answer.
+
+### Idea intake
+
+Flow: idea → up to 3 rounds of ≤5 clarifying questions → brief. The user can skip ahead
+("Write the brief now"), leave answers blank (sent to Claude as "skipped"), regenerate the
+brief, or restart with a new idea (replaces questions, answers and brief).
+
+| Table                   | Purpose                                                              |
+| ----------------------- | -------------------------------------------------------------------- |
+| `idea_intakes`          | One per project (PK = project id): idea, status, current round, brief JSON, model, version |
+| `idea_intake_questions` | Questions per round with rationale and the user's answer            |
+
+The brief (`ProjectBrief`: title, summary, problem, target users, goals, core features, out of
+scope, constraints, open questions) is the input for the requirements phase.
 
 ### Configuration
 
