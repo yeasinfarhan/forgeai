@@ -11,9 +11,10 @@ Idea → Requirements → Architecture → Database Design → API Design
 Claude acts as the reasoning engine. The application itself owns everything around it: projects,
 persistent context, approvals, tasks, generated artifacts and the development workflow.
 
-> **Status: Phase 4 — Requirements.** Users register, manage projects, turn an idea into a
-> structured project brief, and generate, edit, review and approve requirements from it. Later
-> stages are planned in
+> **Status: Phase 5 — Architecture.** Users register, manage projects, turn an idea into a
+> structured project brief, generate and approve requirements, and from those an architecture
+> (components, decision records, Mermaid diagrams) with the same review workflow. Later stages are
+> planned in
 > [`docs/development-plan.md`](docs/development-plan.md).
 
 ---
@@ -37,7 +38,9 @@ forgeai/
 │   │   ├── ForgeAiApplication.java
 │   │   ├── common/exception/    Global exception handling (RFC 9457 problem details)
 │   │   ├── ai/                  AI clients (Claude, Gemini), prompt templates, AI errors
+│   │   ├── architecture/        Architecture proposal: generation, editing, review workflow, history
 │   │   ├── auth/                Registration, login, JWT issuing
+│   │   ├── common/review/       Review workflow shared by requirements and architecture
 │   │   ├── common/security/     Current-user helper
 │   │   ├── config/              Security, JWT settings, startup database check
 │   │   ├── health/              GET /api/health
@@ -55,6 +58,7 @@ forgeai/
 ├── frontend/                    React + Vite application
 │   ├── src/
 │   │   ├── auth/                Session state, route guard
+│   │   ├── components/architecture/ Architecture sections, editors, Mermaid rendering, history
 │   │   ├── components/intake/   Idea intake panel, brief view
 │   │   ├── components/layout/   App shell: sidebar, header, layouts
 │   │   ├── components/requirements/ Requirement cards, form, summary card
@@ -242,6 +246,12 @@ curl http://localhost:8080/api/health
 | POST   | `/api/projects/{id}/requirements/bulk-status`  | ✓ | Move every requirement in one status        |
 | DELETE | `/api/projects/{id}/requirements/{rid}`        | ✓ | Delete (not when approved) → `204`          |
 | GET    | `/api/projects/{id}/requirements/{rid}/history`| ✓ | Revision history, newest first              |
+| GET    | `/api/projects/{id}/architecture`                 | ✓ | Architecture (or null), approved requirements, readiness |
+| POST   | `/api/projects/{id}/architecture/generate`        | ✓ | Generate / regenerate (draft only) from approved requirements |
+| PUT    | `/api/projects/{id}/architecture`                 | ✓ | Save edited content (needs `version`; not when approved) |
+| POST   | `/api/projects/{id}/architecture/status`          | ✓ | Move through draft → in review → approved   |
+| GET    | `/api/projects/{id}/architecture/revisions`       | ✓ | Revision history, newest first              |
+| GET    | `/api/projects/{id}/architecture/revisions/{n}`   | ✓ | One earlier revision with its full content  |
 
 Intake endpoints call Claude and can take up to a minute. AI failures return a problem detail with
 a `reason` (`NOT_CONFIGURED`, `RATE_LIMITED`, `TIMEOUT`, …) and a message safe to show users.

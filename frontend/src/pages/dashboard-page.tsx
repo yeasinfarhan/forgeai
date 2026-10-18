@@ -14,7 +14,7 @@ import { formatRelative } from "@/lib/format";
 const PIPELINE_STAGES: { name: string; detail: string; available?: boolean }[] = [
   { name: "Idea", detail: "Describe the idea; Claude clarifies it and writes a brief", available: true },
   { name: "Requirements", detail: "Generate, review and approve requirements", available: true },
-  { name: "Architecture", detail: "System components and their boundaries" },
+  { name: "Architecture", detail: "Components, decisions and diagrams from approved requirements", available: true },
   { name: "Database design", detail: "Entities, relations and migrations" },
   { name: "API design", detail: "Endpoints, contracts and error model" },
   { name: "Development tasks", detail: "A prioritised, reviewable backlog" },

@@ -17,6 +17,8 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
+import com.forgeai.common.review.ReviewStatus;
+
 /**
  * One requirement of a project, identified to people by a stable code such as {@code FR-003}.
  * Every change is versioned (optimistic locking) and snapshotted in {@link RequirementRevision}.
@@ -57,7 +59,7 @@ public class Requirement {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private RequirementStatus status;
+    private ReviewStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10, updatable = false)
@@ -85,7 +87,7 @@ public class Requirement {
         this.type = type;
         this.seqNumber = seqNumber;
         this.source = source;
-        this.status = RequirementStatus.DRAFT;
+        this.status = ReviewStatus.DRAFT;
         apply(content);
     }
 
@@ -96,7 +98,7 @@ public class Requirement {
         updatedAt = now();
     }
 
-    void moveTo(RequirementStatus target) {
+    void moveTo(ReviewStatus target) {
         status = target;
         updatedAt = now();
     }
@@ -169,7 +171,7 @@ public class Requirement {
         return priority;
     }
 
-    public RequirementStatus getStatus() {
+    public ReviewStatus getStatus() {
         return status;
     }
 

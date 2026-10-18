@@ -171,6 +171,44 @@ The AI call runs outside any transaction; the replace runs in a short one afterw
 
 Conflicts (stale `version`, editing approved items, generating without a brief) return `409`.
 
+The review workflow (`ReviewStatus`, in `com.forgeai.common.review`) is shared with the
+architecture stage.
+
+### Architecture (`com.forgeai.architecture`)
+
+One architecture per project, generated from the **approved** requirements (generation is refused
+until every requirement is approved). Its content is a JSON document (`ArchitectureContent`):
+
+- overview, architectural style and why it fits;
+- components: name, kind (client, service, data store, external, infrastructure), responsibility,
+  technology, dependencies (by component name) and the requirement codes it addresses;
+- decisions: architecture decision records (context, decision, alternatives, consequences,
+  requirement codes), shown as `ADR-001` …;
+- flows: key interactions as Mermaid sequence diagrams.
+
+The component diagram is not stored: the frontend derives a Mermaid flowchart from the component
+list, so it always matches the components. Mermaid is loaded lazily and runs with
+`securityLevel: "strict"`, because labels come from AI output and user edits.
+
+`ArchitectureRules` keeps the content consistent: unique component names, dependencies that point
+at real components, requirement codes that exist. A person's edit that breaks a rule is rejected
+with `400` and one message per problem (`problems` in the problem detail); AI output is repaired
+instead (duplicates and unknown references dropped, code fences removed, sizes capped).
+
+Same workflow as requirements: draft → in review → approved, approved is locked until reopened,
+and approving needs every requirement approved. Regeneration is allowed only in draft and the
+replaced content stays in the history. Every generation, edit and status change stores a full
+snapshot in `architecture_revisions`, and any revision can be opened read-only.
+
+A SHA-256 fingerprint of the approved requirements (id + version) is stored at generation; when the
+requirements change afterwards the page says so. Requirement coverage (which component or decision
+addresses each approved requirement) is computed on every read.
+
+| Table                    | Purpose                                                          |
+| ------------------------ | ---------------------------------------------------------------- |
+| `architectures`          | Current architecture per project: status, content JSON, model, requirements fingerprint, revision |
+| `architecture_revisions` | Snapshot per change (`GENERATED`, `EDITED`, `STATUS_CHANGED`)     |
+
 ### Configuration
 
 All environment-specific values come from environment variables (see `.env.example`). The

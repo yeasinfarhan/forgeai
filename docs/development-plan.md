@@ -7,9 +7,9 @@ only when the previous one is complete and reviewed.
 | ----- | -------------------------------------- | ----------- |
 | 1     | Foundation                             | Complete    |
 | 2     | Authentication & projects              | Complete    |
-| 3     | AI module & idea intake                | Implemented |
-| 4     | Requirements                           | Planned     |
-| 5     | Architecture                           | Planned     |
+| 3     | AI module & idea intake                | Complete    |
+| 4     | Requirements                           | Complete    |
+| 5     | Architecture                           | Implemented |
 | 6     | Database & API design                  | Planned     |
 | 7     | Development tasks                      | Planned     |
 | 8     | Code generation                        | Planned     |
@@ -58,7 +58,7 @@ Delivered:
 - Usage is logged per call (tokens, duration, attempts); persisting usage for cost reporting is
   left for Phase 11.
 
-## Phase 4 — Requirements ✅ (implemented)
+## Phase 4 — Requirements ✅
 
 Delivered:
 
@@ -71,11 +71,21 @@ Delivered:
   approved, in-review, edited and hand-written requirements.
 - Optimistic locking so two tabs cannot silently overwrite each other.
 
-## Phase 5 — Architecture
+## Phase 5 — Architecture (implemented)
 
-- Generate an architecture proposal: components, responsibilities, technology choices and trade-offs.
-- Rendered diagrams (e.g. Mermaid) alongside the written decision record.
-- Same approval and versioning workflow as requirements.
+Delivered:
+
+- Architecture proposal generated from the approved requirements (and the brief): overview and
+  style, components with responsibilities and technology, decision records with alternatives and
+  trade-offs, and key flows. Every component and decision refers to the requirement codes it
+  addresses; a coverage table shows anything left unaddressed.
+- Rendered Mermaid diagrams: a component diagram derived from the component list and sequence
+  diagrams for the flows, with live preview while editing.
+- Section-by-section editing with consistency checks (unique names, real dependencies, real
+  requirement codes).
+- Same review workflow as requirements (shared `ReviewStatus`), full revision history with
+  read-only viewing, regeneration only in draft, and a warning when the approved requirements
+  change after generation.
 
 ## Phase 6 — Database & API design
 

@@ -19,4 +19,30 @@ public record ProjectBrief(
 
     public record Feature(String name, String description) {
     }
+
+    /** Plain-text rendering used in AI prompts of later phases. */
+    public String toPromptText() {
+        StringBuilder text = new StringBuilder();
+        text.append("Title: ").append(title).append('\n');
+        text.append("Summary: ").append(summary).append('\n');
+        if (problem != null && !problem.isBlank()) text.append("Problem: ").append(problem).append('\n');
+        appendList(text, "Target users", targetUsers);
+        appendList(text, "Goals", goals);
+        if (coreFeatures != null && !coreFeatures.isEmpty()) {
+            text.append("Core features:\n");
+            for (Feature feature : coreFeatures) {
+                text.append("- ").append(feature.name()).append(": ").append(feature.description()).append('\n');
+            }
+        }
+        appendList(text, "Out of scope", outOfScope);
+        appendList(text, "Constraints", constraints);
+        appendList(text, "Open questions", openQuestions);
+        return text.toString().strip();
+    }
+
+    private static void appendList(StringBuilder text, String heading, List<String> items) {
+        if (items == null || items.isEmpty()) return;
+        text.append(heading).append(":\n");
+        items.forEach(item -> text.append("- ").append(item).append('\n'));
+    }
 }

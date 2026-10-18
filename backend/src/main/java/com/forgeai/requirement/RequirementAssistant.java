@@ -107,26 +107,7 @@ class RequirementAssistant {
     // --- Rendering -------------------------------------------------------------
 
     static String renderBrief(ProjectBrief brief) {
-        StringBuilder text = new StringBuilder();
-        text.append("Title: ").append(brief.title()).append('\n');
-        text.append("Summary: ").append(brief.summary()).append('\n');
-        if (!isBlank(brief.problem())) text.append("Problem: ").append(brief.problem()).append('\n');
-        appendList(text, "Target users", brief.targetUsers());
-        appendList(text, "Goals", brief.goals());
-        text.append("Core features:\n");
-        for (ProjectBrief.Feature feature : brief.coreFeatures()) {
-            text.append("- ").append(feature.name()).append(": ").append(feature.description()).append('\n');
-        }
-        appendList(text, "Out of scope", brief.outOfScope());
-        appendList(text, "Constraints", brief.constraints());
-        appendList(text, "Open questions", brief.openQuestions());
-        return text.toString().strip();
-    }
-
-    private static void appendList(StringBuilder text, String heading, List<String> items) {
-        if (items == null || items.isEmpty()) return;
-        text.append(heading).append(":\n");
-        items.forEach(item -> text.append("- ").append(item).append('\n'));
+        return brief.toPromptText();
     }
 
     static String renderClarifications(List<IntakeResponse.Round> rounds) {

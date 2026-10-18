@@ -243,7 +243,11 @@ export function RequirementsPage() {
 
       {overview.allApproved && (
         <p className="rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-          All {overview.counts.total} requirements are approved. They are ready for the architecture phase.
+          All {overview.counts.total} requirements are approved. They are ready for the{" "}
+          <Link to={`/projects/${project.id}/architecture`} className="underline hover:no-underline">
+            architecture
+          </Link>
+          .
         </p>
       )}
 

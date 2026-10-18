@@ -15,6 +15,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
+import com.forgeai.common.review.ReviewStatus;
+
 /** Snapshot of a requirement right after a change. Append-only. */
 @Entity
 @Table(name = "requirement_revisions")
@@ -52,7 +54,7 @@ public class RequirementRevision {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20, updatable = false)
-    private RequirementStatus status;
+    private ReviewStatus status;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -108,7 +110,7 @@ public class RequirementRevision {
         return priority;
     }
 
-    public RequirementStatus getStatus() {
+    public ReviewStatus getStatus() {
         return status;
     }
 

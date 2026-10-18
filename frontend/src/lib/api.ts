@@ -15,12 +15,15 @@ export interface FieldViolation {
 export class ApiError extends Error {
   readonly status: number;
   readonly violations: FieldViolation[];
+  /** Rule violations the server explains in words (e.g. a reference to something that does not exist). */
+  readonly problems: string[];
 
-  constructor(status: number, message: string, violations: FieldViolation[] = []) {
+  constructor(status: number, message: string, violations: FieldViolation[] = [], problems: string[] = []) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.violations = violations;
+    this.problems = problems;
   }
 }
 
@@ -76,18 +79,34 @@ export async function apiRequest<T>(path: string, { method = "GET", body, signal
 async function toApiError(response: Response): Promise<ApiError> {
   let message = `Request failed with status ${response.status}`;
   let violations: FieldViolation[] = [];
+  let problems: string[] = [];
   try {
-    const problem = (await response.json()) as { detail?: string; title?: string; violations?: FieldViolation[] };
+    const problem = (await response.json()) as {
+      detail?: string;
+      title?: string;
+      violations?: FieldViolation[];
+      problems?: string[];
+    };
     message = problem.detail ?? problem.title ?? message;
     violations = problem.violations ?? [];
+    problems = problem.problems ?? [];
   } catch {
     // Body was empty or not JSON; keep the generic message.
   }
-  return new ApiError(response.status, message, violations);
+  return new ApiError(response.status, message, violations, problems);
 }
 
 export function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+/** Every message in an error: rule problems, field violations, or just the main message. */
+export function errorDetails(error: unknown): string[] {
+  if (error instanceof ApiError) {
+    if (error.problems.length > 0) return error.problems;
+    if (error.violations.length > 0) return error.violations.map((v) => `${v.field}: ${v.message}`);
+  }
+  return [errorMessage(error)];
 }
 
 /** A user-facing message for any error thrown by the API client. */
@@ -342,4 +361,130 @@ export function deleteRequirement(projectId: string, requirementId: string): Pro
 
 export function getRequirementHistory(projectId: string, requirementId: string): Promise<RequirementRevision[]> {
   return apiRequest<RequirementRevision[]>(requirementsPath(projectId, `/${requirementId}/history`));
+}
+
+// --- Architecture ------------------------------------------------------------
+
+/** The review workflow shared by requirements and architecture. */
+export type ReviewStatus = RequirementStatus;
+
+export type ComponentKind = "CLIENT" | "SERVICE" | "DATA_STORE" | "EXTERNAL" | "INFRASTRUCTURE";
+
+export interface ArchitectureComponent {
+  name: string;
+  kind: ComponentKind;
+  responsibility: string;
+  technology: string | null;
+  dependsOn: string[];
+  requirements: string[];
+}
+
+export interface ArchitectureDecision {
+  title: string;
+  context: string;
+  decision: string;
+  alternatives: string[];
+  consequences: string;
+  requirements: string[];
+}
+
+export interface ArchitectureFlow {
+  title: string;
+  description: string | null;
+  /** Mermaid source, normally a sequenceDiagram. */
+  diagram: string;
+}
+
+export interface ArchitectureContent {
+  overview: string;
+  style: string;
+  styleRationale: string;
+  components: ArchitectureComponent[];
+  decisions: ArchitectureDecision[];
+  flows: ArchitectureFlow[];
+}
+
+export interface Architecture {
+  status: ReviewStatus;
+  content: ArchitectureContent;
+  model: string | null;
+  edited: boolean;
+  revision: number;
+  version: number;
+  /** The approved requirements changed since this content was generated. */
+  requirementsChanged: boolean;
+  /** Approved requirement codes that no component or decision refers to. */
+  uncoveredRequirements: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RequirementRef {
+  code: string;
+  type: RequirementType;
+  title: string;
+  priority: RequirementPriority;
+}
+
+export interface ArchitectureOverview {
+  architecture: Architecture | null;
+  /** The approved requirements the architecture is built from. */
+  requirements: RequirementRef[];
+  requirementsTotal: number;
+  requirementsApproved: number;
+  canGenerate: boolean;
+}
+
+export interface ArchitectureRevisionSummary {
+  revision: number;
+  change: "GENERATED" | "EDITED" | "STATUS_CHANGED";
+  status: ReviewStatus;
+  model: string | null;
+  createdAt: string;
+}
+
+export interface ArchitectureRevisionDetail extends ArchitectureRevisionSummary {
+  content: ArchitectureContent;
+}
+
+function architecturePath(projectId: string, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/architecture${suffix}`;
+}
+
+export function getArchitecture(projectId: string, signal?: AbortSignal): Promise<ArchitectureOverview> {
+  return apiRequest<ArchitectureOverview>(architecturePath(projectId), { signal });
+}
+
+export function generateArchitecture(projectId: string): Promise<ArchitectureOverview> {
+  return apiRequest<ArchitectureOverview>(architecturePath(projectId, "/generate"), { method: "POST" });
+}
+
+export function updateArchitecture(
+  projectId: string,
+  architecture: Architecture,
+  content: ArchitectureContent,
+): Promise<ArchitectureOverview> {
+  return apiRequest<ArchitectureOverview>(architecturePath(projectId), {
+    method: "PUT",
+    body: { content, version: architecture.version },
+  });
+}
+
+export function changeArchitectureStatus(
+  projectId: string,
+  architecture: Architecture,
+  status: ReviewStatus,
+): Promise<ArchitectureOverview> {
+  return apiRequest<ArchitectureOverview>(architecturePath(projectId, "/status"), {
+    method: "POST",
+    body: { status, version: architecture.version },
+  });
+}
+
+export function getArchitectureHistory(projectId: string): Promise<ArchitectureRevisionSummary[]> {
+  return apiRequest<ArchitectureRevisionSummary[]>(architecturePath(projectId, "/revisions"));
+}
+
+export function getArchitectureRevision(projectId: string, revision: number): Promise<ArchitectureRevisionDetail> {
+  return apiRequest<ArchitectureRevisionDetail>(architecturePath(projectId, `/revisions/${revision}`));
 }

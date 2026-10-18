@@ -8,6 +8,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import com.forgeai.common.review.ReviewStatus;
+
 /** Request and response bodies of the requirements API. */
 public final class RequirementDtos {
 
@@ -43,11 +45,11 @@ public final class RequirementDtos {
         }
     }
 
-    public record ChangeStatus(@NotNull RequirementStatus status, @NotNull Integer version) {
+    public record ChangeStatus(@NotNull ReviewStatus status, @NotNull Integer version) {
     }
 
     /** Moves every requirement currently in {@code from} to {@code to}, e.g. "approve everything in review". */
-    public record BulkChangeStatus(@NotNull RequirementStatus from, @NotNull RequirementStatus to) {
+    public record BulkChangeStatus(@NotNull ReviewStatus from, @NotNull ReviewStatus to) {
     }
 
     // --- Responses -------------------------------------------------------------
@@ -65,7 +67,7 @@ public final class RequirementDtos {
             String description,
             List<String> acceptanceCriteria,
             Priority priority,
-            RequirementStatus status,
+            ReviewStatus status,
             RequirementSource source,
             boolean edited,
             int version,
@@ -89,7 +91,7 @@ public final class RequirementDtos {
             String description,
             List<String> acceptanceCriteria,
             Priority priority,
-            RequirementStatus status,
+            ReviewStatus status,
             Instant createdAt) {
 
         static RevisionResponse from(RequirementRevision r) {

@@ -3,6 +3,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { FormError } from "@/components/form-field";
+import { ArchitectureSummaryCard } from "@/components/architecture/architecture-summary-card";
 import { IdeaIntakePanel } from "@/components/intake/idea-intake-panel";
 import { RequirementsSummaryCard } from "@/components/requirements/requirements-summary-card";
 import { ProjectForm } from "@/components/project-form";
@@ -173,6 +174,8 @@ function ProjectDetail({ project, onUpdated }: { project: Project; onUpdated: (p
       <IdeaIntakePanel project={project} />
 
       <RequirementsSummaryCard projectId={project.id} />
+
+      <ArchitectureSummaryCard projectId={project.id} />
     </>
   );
 }

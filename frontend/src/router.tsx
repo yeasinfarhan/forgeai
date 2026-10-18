@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router";
 import { RequireAuth } from "@/auth/require-auth";
 import { AppLayout } from "@/components/layout/app-layout";
 import { AuthLayout } from "@/components/layout/auth-layout";
+import { ArchitecturePage } from "@/pages/architecture-page";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
 import { NewProjectPage } from "@/pages/new-project-page";
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "projects/new", element: <NewProjectPage />, handle: { title: "New project" } },
       { path: "projects/:projectId", element: <ProjectDetailPage />, handle: { title: "Project" } },
       { path: "projects/:projectId/requirements", element: <RequirementsPage />, handle: { title: "Requirements" } },
+      { path: "projects/:projectId/architecture", element: <ArchitecturePage />, handle: { title: "Architecture" } },
       { path: "*", element: <NotFoundPage />, handle: { title: "Not found" } },
     ],
   },

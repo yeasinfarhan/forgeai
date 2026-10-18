@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.forgeai.common.exception.ConflictException;
 import com.forgeai.common.exception.ResourceNotFoundException;
+import com.forgeai.common.review.ReviewStatus;
 import com.forgeai.intake.IdeaIntakeService;
 import com.forgeai.intake.IntakeStatus;
 import com.forgeai.project.ProjectService;
@@ -99,7 +100,7 @@ public class RequirementService {
     @Transactional
     public void delete(UUID ownerId, UUID projectId, UUID requirementId) {
         Requirement requirement = findOwned(ownerId, projectId, requirementId);
-        if (requirement.getStatus() == RequirementStatus.APPROVED) {
+        if (requirement.getStatus() == ReviewStatus.APPROVED) {
             throw new ConflictException(requirement.code() + " is approved. Reopen it before deleting.");
         }
         requirements.delete(requirement);
@@ -113,13 +114,23 @@ public class RequirementService {
                 .toList();
     }
 
+    // --- Used by later phases --------------------------------------------------
+
+    /** All requirements of a project, for phases that build on approved requirements. */
+    @Transactional(readOnly = true)
+    public RequirementSnapshot snapshot(UUID projectId) {
+        return new RequirementSnapshot(requirements.findAllByProjectIdOrderByTypeAscSeqNumberAsc(projectId).stream()
+                .map(RequirementResponse::from)
+                .toList());
+    }
+
     // --- Used by RequirementGenerationService ----------------------------------
 
     /** Requirements that regeneration keeps: everything except untouched AI drafts. */
     @Transactional(readOnly = true)
     public List<Requirement> keptOnRegeneration(UUID projectId) {
         return requirements.findAllByProjectIdOrderByTypeAscSeqNumberAsc(projectId).stream()
-                .filter(r -> !(r.getStatus() == RequirementStatus.DRAFT
+                .filter(r -> !(r.getStatus() == ReviewStatus.DRAFT
                         && r.getSource() == RequirementSource.AI
                         && !r.isEdited()))
                 .toList();
@@ -163,7 +174,7 @@ public class RequirementService {
 
     // --- Helpers ---------------------------------------------------------------
 
-    private void moveTo(Requirement requirement, RequirementStatus target) {
+    private void moveTo(Requirement requirement, ReviewStatus target) {
         if (!requirement.getStatus().canMoveTo(target)) {
             throw new ConflictException(requirement.code() + ": " + transitionError(requirement.getStatus(), target));
         }
@@ -172,16 +183,8 @@ public class RequirementService {
         revisions.save(RequirementRevision.of(requirement, RevisionChange.STATUS_CHANGED));
     }
 
-    private static String transitionError(RequirementStatus from, RequirementStatus to) {
-        return "cannot move from " + label(from) + " to " + label(to) + ".";
-    }
-
-    private static String label(RequirementStatus status) {
-        return switch (status) {
-            case DRAFT -> "draft";
-            case IN_REVIEW -> "in review";
-            case APPROVED -> "approved";
-        };
+    private static String transitionError(ReviewStatus from, ReviewStatus to) {
+        return "cannot move from " + from.label() + " to " + to.label() + ".";
     }
 
     private static void checkVersion(Requirement requirement, int expectedVersion) {
