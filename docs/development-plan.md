@@ -13,9 +13,9 @@ only when the previous one is complete and reviewed.
 | 6     | Database & API design                  | Complete    |
 | 7     | Development tasks                      | Complete    |
 | 8     | Code generation                        | Complete    |
-| 9     | Tests & code review                    | Implemented |
-| 10    | Documentation & export                 | Planned     |
-| 11    | Hardening & release                    | Planned     |
+| 9     | Tests & code review                    | Complete    |
+| 10    | Documentation & export                 | Complete    |
+| 11    | Hardening & release                    | Implemented |
 
 ---
 
@@ -122,7 +122,7 @@ Delivered:
 - File browser over the accepted code and ZIP export. Git push is left out on purpose: it needs
   stored repository credentials.
 
-## Phase 9 — Tests & code review (implemented)
+## Phase 9 — Tests & code review ✅
 
 Delivered:
 
@@ -133,14 +133,29 @@ Delivered:
 - A finding becomes a backlog task in one click, or is dismissed (and can be reopened); reviews keep
   their history and say when the code changed since.
 
-## Phase 10 — Documentation & export
+## Phase 10 — Documentation & export ✅
 
-- Generate README, API reference and developer guides from the project's approved artifacts.
-- Export the full project package.
+Delivered:
 
-## Phase 11 — Hardening & release
+- README and developer guide written by the AI from the approved design and the accepted code;
+  editable, rewritable, flagged when the design or code changed since.
+- API reference, requirements, architecture (with diagrams), data model (with ER diagram and SQL),
+  OpenAPI document and backlog rendered from the approved design without the AI.
+- Documentation page with Markdown preview (Mermaid diagrams drawn, links between documents work)
+  and the full project package as one ZIP: code plus all documents.
 
-- Rate limiting and cost controls for AI usage.
-- Observability: structured logging, metrics, tracing.
-- CI pipeline (build, test, lint, image publishing).
-- Security review, accessibility pass and performance tuning.
+## Phase 11 — Hardening & release (implemented)
+
+Delivered:
+
+- Every AI call recorded per user and project; per-user limits on requests per hour and tokens per
+  24 hours (429 with `Retry-After`); an AI usage page. Failed sign-ins limited per email and address.
+- Structured JSON logs with request and trace ids, one line per request; Prometheus metrics
+  (including AI calls and tokens) and health probes on a separate port; OpenTelemetry tracing with
+  opt-in export.
+- GitHub Actions CI: backend tests, strict frontend type-check and build, image publishing to GHCR.
+- Security review ([security.md](security.md)): security headers and CSP, backend bound to
+  localhost, actuator unpublished. Accessibility: skip link, hidden mobile menu out of the tab order,
+  toggle buttons with proper states, reduced-motion support. Performance: stage pages split into
+  separate bundles, compression, caching rules.
+- Version 1.0.0.

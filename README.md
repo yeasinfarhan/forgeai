@@ -11,13 +11,15 @@ Idea → Requirements → Architecture → Database Design → API Design
 Claude acts as the reasoning engine. The application itself owns everything around it: projects,
 persistent context, approvals, tasks, generated artifacts and the development workflow.
 
-> **Status: Phase 9 — Tests & code review.** Users register, manage projects, turn an idea into a
+> **Status: Release 1.0.** Users register, manage projects, turn an idea into a
 > structured project brief, then generate, edit, review and approve requirements, an architecture,
 > a data model (ER diagram, SQL export) and an HTTP API (OpenAPI export), break the approved
 > design into an ordered backlog tracked on a board, and generate the code and its tests task by
 > task — every file reviewed as a diff before it is accepted, the result downloadable as a ZIP —
-> then have the code reviewed and turn findings into tasks. Later stages are planned in
-> [`docs/development-plan.md`](docs/development-plan.md).
+> then have the code reviewed and turn findings into tasks, write a README and developer guide,
+> and download everything as one project package. AI usage is limited and reported per user, and
+> the service is observable (JSON logs, Prometheus metrics, OpenTelemetry traces) and built by CI.
+> How it was built is in [`docs/development-plan.md`](docs/development-plan.md).
 
 ---
 
@@ -65,6 +67,7 @@ forgeai/
 │   │   ├── auth/                Session state, route guard
 │   │   ├── components/architecture/ Architecture sections, editors, Mermaid rendering, history
 │   │   ├── components/code/     Code page: change set review, diff view, file browser
+│   │   ├── components/docs/     Documentation page parts: Markdown viewer, summary card
 │   │   ├── components/design/   Database & API design pages, editors, ER diagram, exports, findings
 │   │   ├── components/intake/   Idea intake panel, brief view
 │   │   ├── components/layout/   App shell: sidebar, header, layouts
@@ -126,6 +129,15 @@ openssl rand -base64 48                                                         
 | `GEMINI_MODEL`      | Gemini model (default `gemini-3.8-flash`)                | Phase 3   |
 | `JWT_SECRET`        | Secret for signing access tokens — **required**, 32+ chars | Phase 2   |
 | `JWT_EXPIRATION`    | Access-token lifetime (ISO-8601, default `PT8H`)         | Phase 2   |
+| `AI_REQUESTS_PER_HOUR` | AI calls per user in any hour (default 60, 0 = no limit) | Phase 11 |
+| `AI_TOKENS_PER_DAY` | AI tokens per user in any 24 hours (default 2 000 000, 0 = no limit) | Phase 11 |
+| `LOGIN_MAX_FAILURES_PER_EMAIL` | Failed sign-ins per email per 15 minutes (default 10) | Phase 11 |
+| `LOGIN_MAX_FAILURES_PER_ADDRESS` | Failed sign-ins per client address per 15 minutes (default 50) | Phase 11 |
+| `LOG_FORMAT`        | Backend log format in Docker: `ecs` (default), `logstash`, `gelf` | Phase 11 |
+| `MANAGEMENT_PORT`   | Port of health/metrics endpoints (default 8081)          | Phase 11  |
+
+Tracing export, sampling and the other operational settings are described in
+[`docs/operations.md`](docs/operations.md).
 
 The backend reads the root `.env` automatically when started from `backend/` or the project root.
 Real environment variables always override values in `.env`. **Never commit `.env`** — it is git-ignored.
@@ -211,10 +223,12 @@ docker compose up --build
 | Service    | URL                     |
 | ---------- | ----------------------- |
 | Frontend   | http://localhost:3000   |
-| Backend    | http://localhost:8080   |
+| Backend    | http://localhost:8080 (this machine only) |
 | PostgreSQL | localhost:5432          |
 
 The frontend container (nginx) serves the built app and forwards `/api` to the backend container.
+Health and Prometheus metrics are on port 8081 inside the Compose network (see
+[`docs/operations.md`](docs/operations.md)).
 Stop everything with `docker compose down`.
 
 ## API health check
@@ -295,6 +309,13 @@ curl http://localhost:8080/api/health
 | GET    | `/api/projects/{id}/reviews/{rid}`                | ✓ | One review with its findings                |
 | POST   | `/api/projects/{id}/reviews/{rid}/findings/{fid}/task` | ✓ | Turn a finding into a backlog task     |
 | POST   | `/api/projects/{id}/reviews/{rid}/findings/{fid}/dismiss` | ✓ | Dismiss (`reopen` undoes it)        |
+| GET    | `/api/projects/{id}/docs`                         | ✓ | Documents, blocker, package contents        |
+| GET    | `/api/projects/{id}/docs/documents/{kind}`        | ✓ | README or DEVELOPER_GUIDE                   |
+| POST   | `/api/projects/{id}/docs/documents/{kind}/generate` | ✓ | Write (or rewrite) it with the AI         |
+| PUT    | `/api/projects/{id}/docs/documents/{kind}`        | ✓ | Save an edit (needs `version`)              |
+| GET    | `/api/projects/{id}/docs/package/file?path=`      | ✓ | One file of the project package             |
+| GET    | `/api/projects/{id}/docs/package.zip`             | ✓ | Full project package (download)             |
+| GET    | `/api/usage`                                      | ✓ | Your AI usage: last hour, 24 h, 14 days, by kind and project |
 
 Intake endpoints call Claude and can take up to a minute. AI failures return a problem detail with
 a `reason` (`NOT_CONFIGURED`, `RATE_LIMITED`, `TIMEOUT`, …) and a message safe to show users.
@@ -328,4 +349,6 @@ Tests never call a real AI provider: it is mocked, so `mvn test` needs no key an
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Operations](docs/operations.md): limits, logs, metrics, tracing, CI and releases
+- [Security review](docs/security.md)
 - [Development plan](docs/development-plan.md)

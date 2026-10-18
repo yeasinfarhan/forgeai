@@ -43,8 +43,21 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (at least 32 characters)}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-PT8H}
+      # Per-user AI allowance (0 = no limit) and sign-in protection.
+      AI_REQUESTS_PER_HOUR: ${AI_REQUESTS_PER_HOUR:-60}
+      AI_TOKENS_PER_DAY: ${AI_TOKENS_PER_DAY:-2000000}
+      LOGIN_MAX_FAILURES_PER_EMAIL: ${LOGIN_MAX_FAILURES_PER_EMAIL:-10}
+      LOGIN_MAX_FAILURES_PER_ADDRESS: ${LOGIN_MAX_FAILURES_PER_ADDRESS:-50}
+      # Requests arrive through the frontend's nginx: take the client address from X-Forwarded-For.
+      FORWARD_HEADERS_STRATEGY: native
+      # JSON logs (ecs, logstash or gelf), with trace and request ids.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT:-ecs}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      # Only reachable from this machine; browsers use the API through the frontend (/api).
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    # Actuator (health, Prometheus metrics) listens on 8081 inside the Compose network only.
+    expose:
+      - "8081"
 
   frontend:
     build: ./frontend

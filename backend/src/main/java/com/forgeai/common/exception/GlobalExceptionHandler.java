@@ -122,6 +122,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    ResponseEntity<ProblemDetail> handleTooManyRequests(TooManyRequestsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problem.setTitle("Too many requests");
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(Math.max(1, ex.retryAfter().toSeconds())))
+                .body(problem);
+    }
+
     /** AI failures: technical detail goes to the log, a safe explanation goes to the client. */
     @ExceptionHandler(AiException.class)
     ProblemDetail handleAi(AiException ex) {

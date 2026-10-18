@@ -6,6 +6,7 @@ import { FormError } from "@/components/form-field";
 import { ArchitectureSummaryCard } from "@/components/architecture/architecture-summary-card";
 import { CodeSummaryCard } from "@/components/code/code-summary-card";
 import { DesignSummaryCard } from "@/components/design/design-summary-card";
+import { DocsSummaryCard } from "@/components/docs/docs-summary-card";
 import { IdeaIntakePanel } from "@/components/intake/idea-intake-panel";
 import { RequirementsSummaryCard } from "@/components/requirements/requirements-summary-card";
 import { ReviewSummaryCard } from "@/components/review/review-summary-card";
@@ -188,6 +189,8 @@ function ProjectDetail({ project, onUpdated }: { project: Project; onUpdated: (p
       <CodeSummaryCard projectId={project.id} />
 
       <ReviewSummaryCard projectId={project.id} />
+
+      <DocsSummaryCard projectId={project.id} />
     </>
   );
 }

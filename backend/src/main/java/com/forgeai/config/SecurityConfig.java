@@ -30,7 +30,7 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
  * Stateless API security.
  *
  * <ul>
- *   <li>Public: health check, registration and login.</li>
+ *   <li>Public: health check, registration and login (and actuator endpoints, on their own unpublished port).</li>
  *   <li>Everything else requires a valid {@code Authorization: Bearer <token>} header.</li>
  *   <li>Tokens are HS256-signed JWTs issued by {@link com.forgeai.auth.JwtTokenService}.</li>
  * </ul>
@@ -53,6 +53,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/error").permitAll()
+                        // Actuator endpoints are served on the separate management port (MANAGEMENT_PORT),
+                        // which docker-compose.yml does not publish; Prometheus scrapes it inside the network.
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         .anyRequest().authenticated())
                 // Missing or invalid tokens get 401 with a WWW-Authenticate header.

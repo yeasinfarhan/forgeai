@@ -324,6 +324,56 @@ Needs the design approved and at least one accepted file.
 | `code_reviews`    | One review: summary, model, files reviewed, code fingerprint     |
 | `review_findings` | Findings with severity, category, location, status, created task |
 
+### Documentation & package (`com.forgeai.docs`)
+
+Needs the design approved. Two kinds of documents:
+
+- **Written by the AI** (`README.md`, `docs/developer-guide.md`): from the approved requirements,
+  architecture, data model and API, and the accepted code (build and setup files first, then
+  application code, then tests, up to 80 000 characters). The prompt forbids inventing commands,
+  variables or paths the code does not show. They can be edited by hand (optimistic locking) or
+  rewritten; a fingerprint of the design and code they were written from tells when they are outdated.
+- **Derived from the design** on every download, without the AI, so they always match it:
+  `docs/requirements.md`, `docs/architecture.md` (component diagram and flows as Mermaid),
+  `docs/data-model.md` (ER diagram as Mermaid), `docs/database.sql`, `docs/api-reference.md`,
+  `docs/openapi.json`, `docs/backlog.md`.
+
+The **project package** is a ZIP of the accepted code plus all documents, in a folder named after the
+project. A document replaces an accepted file at the same path (typically `README.md`); the page
+lists the package contents and marks such files before download.
+
+| Table               | Purpose                                                       |
+| ------------------- | ------------------------------------------------------------- |
+| `project_documents` | README and developer guide per project: content, model, input fingerprint, edited flag |
+
+### AI usage and limits (`com.forgeai.usage`)
+
+Feature code calls `AiClient`; its only implementation (`MeteredAiClient`, in the AI module) wraps
+the configured `AiProvider` (Claude or Gemini). Before each call it asks every `AiUsageGate`
+whether the call may go ahead, and afterwards reports the outcome to the gates and to Micrometer
+(`forgeai.ai.requests` timer, `forgeai.ai.tokens` counter). The AI module only defines the gate
+interface; `AiUsageService` implements it, so the AI module stays independent of users and the
+database.
+
+`AiUsageService` takes the caller from the request (the JWT's user, the project id in the path),
+refuses calls over the per-user limits with 429 and `Retry-After`, and records every sent call in
+its own transaction (kept even if the request fails). `GET /api/usage` summarises the caller's usage.
+
+| Table      | Purpose                                                              |
+| ---------- | -------------------------------------------------------------------- |
+| `ai_usage` | One row per AI call: user, project, purpose, provider, model, tokens, outcome, duration |
+
+### Operational concerns
+
+- **Sign-in protection**: `LoginThrottle` counts failed sign-ins per email and per client address
+  in memory (15-minute window); over the limit, sign-in answers 429.
+- **Request logging**: `RequestLoggingFilter` assigns a request id (`X-Request-Id`), puts it in the
+  logging context and logs one line per API request; tracing adds trace and span ids.
+- **Observability**: Actuator on a separate management port (health with liveness/readiness,
+  Prometheus metrics), OpenTelemetry tracing (export opt-in), structured JSON logs in Docker.
+  Details in [operations](operations.md).
+- **Security review**: see [security](security.md).
+
 ### Configuration
 
 All environment-specific values come from environment variables (see `.env.example`). The
@@ -378,7 +428,12 @@ src/
 | Service    | Image / build                         | Port  |
 | ---------- | ------------------------------------- | ----- |
 | `postgres` | `postgres:17-alpine`, health-checked  | 5432  |
-| `backend`  | Multi-stage Maven → Temurin 25 JRE    | 8080  |
+| `backend`  | Multi-stage Maven → Temurin 25 JRE    | 8080 (localhost only), 8081 (internal) |
 | `frontend` | Multi-stage Node build → nginx        | 3000  |
 
-The backend waits for PostgreSQL to report healthy before starting.
+The backend waits for PostgreSQL to report healthy before starting. nginx adds security headers
+(Content Security Policy and others), compresses responses and caches fingerprinted assets for a
+year; `index.html` is never cached, and the stage pages are separate bundles loaded on first use.
+
+CI (`.github/workflows/ci.yml`) builds and tests both parts on every push and pull request and
+publishes the images to GitHub Container Registry from `main` and version tags.

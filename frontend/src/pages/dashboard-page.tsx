@@ -21,7 +21,7 @@ const PIPELINE_STAGES: { name: string; detail: string; available?: boolean }[] =
   { name: "Code", detail: "Generated per task, reviewed as diffs, exported as ZIP", available: true },
   { name: "Tests", detail: "Unit and integration tests per task, reviewed as diffs", available: true },
   { name: "Code review", detail: "Findings against the design, turned into tasks", available: true },
-  { name: "Documentation", detail: "Developer and user-facing docs" },
+  { name: "Documentation", detail: "README, developer guide and design docs, packaged with the code", available: true },
 ];
 
 export function DashboardPage() {

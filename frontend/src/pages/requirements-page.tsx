@@ -189,7 +189,7 @@ export function RequirementsPage() {
 
       {hasRequirements && (
         <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center">
-          <div className="flex flex-wrap gap-1" role="tablist" aria-label="Filter by status">
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
             {(
               [
                 ["ALL", "All", overview.counts.total],
@@ -200,8 +200,7 @@ export function RequirementsPage() {
             ).map(([value, label, count]) => (
               <button
                 key={value}
-                role="tab"
-                aria-selected={filter === value}
+                aria-pressed={filter === value}
                 onClick={() => setFilter(value)}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm transition-colors",

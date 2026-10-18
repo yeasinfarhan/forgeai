@@ -30,6 +30,7 @@ import com.forgeai.code.CodeDtos.FileSummary;
 import com.forgeai.code.CodeDtos.TaskItem;
 import com.forgeai.common.exception.ConflictException;
 import com.forgeai.common.exception.ResourceNotFoundException;
+import com.forgeai.common.util.Fingerprints;
 import com.forgeai.design.DesignExport;
 import com.forgeai.project.ProjectResponse;
 import com.forgeai.project.ProjectService;
@@ -205,6 +206,16 @@ public class CodeService {
 
     /** An accepted file, for the code review. */
     public record SourceFile(String path, String content, String lastTaskCode, Instant updatedAt) {
+    }
+
+    /** Identifies the accepted code exactly: changes when any file is added, changed or deleted. */
+    public static String fingerprint(List<SourceFile> files) {
+        List<String> parts = new ArrayList<>();
+        for (SourceFile file : files) {
+            parts.add(file.path());
+            parts.add(file.content());
+        }
+        return Fingerprints.sha256(parts.toArray(String[]::new));
     }
 
     @Transactional(readOnly = true)

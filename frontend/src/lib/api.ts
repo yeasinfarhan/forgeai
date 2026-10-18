@@ -1052,3 +1052,113 @@ export function actOnFinding(
 ): Promise<CodeReview> {
   return apiRequest<CodeReview>(reviewPath(projectId, `/${reviewId}/findings/${findingId}/${action}`), { method: "POST" });
 }
+
+// --- Documentation and project package --------------------------------------------------
+
+export type DocumentKind = "README" | "DEVELOPER_GUIDE";
+/** Where a file of the project package comes from. */
+export type PackageSource = "CODE" | "DOCUMENT" | "DESIGN";
+
+export interface DocumentSummary {
+  kind: DocumentKind;
+  title: string;
+  path: string;
+  /** The AI has written it; the other fields are empty until then. */
+  generated: boolean;
+  edited: boolean;
+  /** The design or the code changed since it was written. */
+  outdated: boolean;
+  model: string | null;
+  generatedAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ProjectDocument {
+  kind: DocumentKind;
+  title: string;
+  path: string;
+  content: string;
+  edited: boolean;
+  outdated: boolean;
+  model: string | null;
+  generatedAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface PackageEntry {
+  path: string;
+  source: PackageSource;
+  size: number;
+  /** An accepted code file has the same path; the package contains this one instead. */
+  replacesCode: boolean;
+}
+
+export interface PackageFile {
+  path: string;
+  source: PackageSource;
+  content: string;
+}
+
+export interface DocsOverview {
+  canGenerate: boolean;
+  blocker: string | null;
+  documents: DocumentSummary[];
+  fileName: string;
+  entries: PackageEntry[];
+}
+
+function docsPath(projectId: string, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/docs${suffix}`;
+}
+
+export function getDocs(projectId: string, signal?: AbortSignal): Promise<DocsOverview> {
+  return apiRequest<DocsOverview>(docsPath(projectId), { signal });
+}
+
+export function getDocument(projectId: string, kind: DocumentKind, signal?: AbortSignal): Promise<ProjectDocument> {
+  return apiRequest<ProjectDocument>(docsPath(projectId, `/documents/${kind}`), { signal });
+}
+
+export function generateDocument(projectId: string, kind: DocumentKind): Promise<ProjectDocument> {
+  return apiRequest<ProjectDocument>(docsPath(projectId, `/documents/${kind}/generate`), { method: "POST" });
+}
+
+export function updateDocument(projectId: string, kind: DocumentKind, content: string, version: number): Promise<ProjectDocument> {
+  return apiRequest<ProjectDocument>(docsPath(projectId, `/documents/${kind}`), { method: "PUT", body: { content, version } });
+}
+
+export function getPackageFile(projectId: string, path: string, signal?: AbortSignal): Promise<PackageFile> {
+  return apiRequest<PackageFile>(docsPath(projectId, `/package/file?path=${encodeURIComponent(path)}`), { signal });
+}
+
+export function packageExportPath(projectId: string) {
+  return docsPath(projectId, "/package.zip");
+}
+
+// --- AI usage ----------------------------------------------------------------------------
+
+export interface UsageTotals {
+  requests: number;
+  failed: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface UsageSummary {
+  /** Per-user allowance; 0 means no limit. */
+  limits: { requestsPerHour: number; tokensPerDay: number };
+  lastHour: UsageTotals;
+  last24Hours: UsageTotals;
+  /** The last 14 days (UTC), oldest first. */
+  days: { date: string; totals: UsageTotals }[];
+  /** The last 30 days by kind of call, most tokens first. */
+  purposes: { purpose: string; totals: UsageTotals }[];
+  /** The last 30 days by project; projectName is null for a deleted project. */
+  projects: { projectId: string; projectName: string | null; totals: UsageTotals }[];
+  generatedAt: string;
+}
+
+export function getUsage(signal?: AbortSignal): Promise<UsageSummary> {
+  return apiRequest<UsageSummary>("/api/usage", { signal });
+}

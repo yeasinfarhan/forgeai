@@ -3,20 +3,26 @@ import { createBrowserRouter } from "react-router";
 import { RequireAuth } from "@/auth/require-auth";
 import { AppLayout } from "@/components/layout/app-layout";
 import { AuthLayout } from "@/components/layout/auth-layout";
-import { ApiDesignPage } from "@/pages/api-design-page";
-import { ArchitecturePage } from "@/pages/architecture-page";
-import { CodePage } from "@/pages/code-page";
+import { lazyPage } from "@/components/layout/lazy-page";
 import { DashboardPage } from "@/pages/dashboard-page";
-import { DatabaseDesignPage } from "@/pages/database-design-page";
 import { LoginPage } from "@/pages/login-page";
 import { NewProjectPage } from "@/pages/new-project-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { ProjectDetailPage } from "@/pages/project-detail-page";
 import { ProjectsPage } from "@/pages/projects-page";
 import { RegisterPage } from "@/pages/register-page";
-import { RequirementsPage } from "@/pages/requirements-page";
-import { ReviewPage } from "@/pages/review-page";
-import { TasksPage } from "@/pages/tasks-page";
+
+// The stage pages are loaded when first opened, so the first visit downloads less
+// (Mermaid and the Markdown renderer are only fetched by the pages that use them).
+const RequirementsPage = lazyPage(() => import("@/pages/requirements-page").then((m) => m.RequirementsPage));
+const ArchitecturePage = lazyPage(() => import("@/pages/architecture-page").then((m) => m.ArchitecturePage));
+const DatabaseDesignPage = lazyPage(() => import("@/pages/database-design-page").then((m) => m.DatabaseDesignPage));
+const ApiDesignPage = lazyPage(() => import("@/pages/api-design-page").then((m) => m.ApiDesignPage));
+const TasksPage = lazyPage(() => import("@/pages/tasks-page").then((m) => m.TasksPage));
+const CodePage = lazyPage(() => import("@/pages/code-page").then((m) => m.CodePage));
+const ReviewPage = lazyPage(() => import("@/pages/review-page").then((m) => m.ReviewPage));
+const DocsPage = lazyPage(() => import("@/pages/docs-page").then((m) => m.DocsPage));
+const UsagePage = lazyPage(() => import("@/pages/usage-page").then((m) => m.UsagePage));
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +51,8 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/tasks", element: <TasksPage />, handle: { title: "Development tasks" } },
       { path: "projects/:projectId/code", element: <CodePage />, handle: { title: "Code" } },
       { path: "projects/:projectId/review", element: <ReviewPage />, handle: { title: "Code review" } },
+      { path: "projects/:projectId/docs", element: <DocsPage />, handle: { title: "Documentation" } },
+      { path: "usage", element: <UsagePage />, handle: { title: "AI usage" } },
       { path: "*", element: <NotFoundPage />, handle: { title: "Not found" } },
     ],
   },

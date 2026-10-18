@@ -1,4 +1,4 @@
-import { FolderKanban, LayoutDashboard, type LucideIcon } from "lucide-react";
+import { Gauge, FolderKanban, LayoutDashboard, type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router";
 
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -16,6 +16,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", to: "/", icon: LayoutDashboard, end: true },
   { label: "Projects", to: "/projects", icon: FolderKanban },
+  { label: "AI usage", to: "/usage", icon: Gauge },
 ];
 
 interface SidebarProps {
@@ -39,7 +40,8 @@ export function Sidebar({ isMobileOpen, onNavigate }: SidebarProps) {
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform md:sticky md:top-0 md:h-svh md:translate-x-0",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full",
+          // Off-screen on small screens: also invisible, so its links are not reachable with Tab.
+          isMobileOpen ? "translate-x-0" : "-translate-x-full max-md:invisible",
         )}
       >
         <div className="flex h-14 items-center gap-2.5 border-b border-sidebar-border px-5">
@@ -78,8 +80,8 @@ export function Sidebar({ isMobileOpen, onNavigate }: SidebarProps) {
         </nav>
 
         <div className="border-t border-sidebar-border px-5 py-4">
-          <p className="text-xs font-medium">Phase 9 · Tests & code review</p>
-          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">v0.9.0</p>
+          <p className="text-xs font-medium">Release 1.0</p>
+          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">v1.0.0</p>
         </div>
       </aside>
     </>

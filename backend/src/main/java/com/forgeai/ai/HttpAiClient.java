@@ -20,7 +20,7 @@ import org.springframework.web.client.RestClientResponseException;
  * are retried, honouring {@code Retry-After}. Connection failures are retried; read timeouts are
  * not, because the request may still be running on the provider's side.
  */
-abstract class HttpAiClient implements AiClient {
+abstract class HttpAiClient implements AiProvider {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(20);
@@ -36,6 +36,11 @@ abstract class HttpAiClient implements AiClient {
 
     /** Short provider name for logs, e.g. {@code "claude"}. */
     protected abstract String provider();
+
+    @Override
+    public final String name() {
+        return provider();
+    }
 
     protected abstract AiProperties.ProviderSettings settings();
 

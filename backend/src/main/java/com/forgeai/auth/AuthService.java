@@ -22,6 +22,7 @@ public class AuthService {
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService tokens;
+    private final LoginThrottle throttle;
 
     /**
      * A real BCrypt hash, compared against when the email is unknown so that login takes the same time
@@ -29,10 +30,11 @@ public class AuthService {
      */
     private final String dummyPasswordHash;
 
-    AuthService(UserRepository users, PasswordEncoder passwordEncoder, JwtTokenService tokens) {
+    AuthService(UserRepository users, PasswordEncoder passwordEncoder, JwtTokenService tokens, LoginThrottle throttle) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokens = tokens;
+        this.throttle = throttle;
         this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
@@ -53,20 +55,29 @@ public class AuthService {
         return AuthResponse.bearer(tokens.issueFor(user), UserResponse.from(user));
     }
 
+    /**
+     * @param clientAddress the caller's network address, for limiting failed attempts per client (may be null)
+     */
     @Transactional(readOnly = true)
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, String clientAddress) {
+        String email = normalizeEmail(request.email());
+        throttle.check(email, clientAddress);
+
         String password = request.password();
         if (password.getBytes(StandardCharsets.UTF_8).length > BCRYPT_MAX_BYTES) {
+            throttle.failed(email, clientAddress);
             throw new InvalidCredentialsException();
         }
 
-        User user = users.findByEmail(normalizeEmail(request.email())).orElse(null);
+        User user = users.findByEmail(email).orElse(null);
         String hash = user != null ? user.getPasswordHash() : dummyPasswordHash;
         boolean passwordMatches = passwordEncoder.matches(password, hash);
 
         if (user == null || !passwordMatches) {
+            throttle.failed(email, clientAddress);
             throw new InvalidCredentialsException();
         }
+        throttle.succeeded(email);
         return AuthResponse.bearer(tokens.issueFor(user), UserResponse.from(user));
     }
 

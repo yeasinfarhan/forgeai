@@ -222,7 +222,7 @@ export function ReviewPage() {
             <span className="text-muted-foreground">{review.counts.low} low</span>
           </div>
 
-          <div role="tablist" aria-label="Filter findings" className="flex flex-wrap gap-1.5">
+          <div role="group" aria-label="Filter findings" className="flex flex-wrap gap-1.5">
             {FILTERS.map((f) => {
               const count =
                 f.value === "ALL"
@@ -236,8 +236,7 @@ export function ReviewPage() {
                 <button
                   key={f.value}
                   type="button"
-                  role="tab"
-                  aria-selected={filter === f.value}
+                  aria-pressed={filter === f.value}
                   onClick={() => setFilter(f.value)}
                   className={cn(
                     "rounded-md border px-2.5 py-1 text-xs",

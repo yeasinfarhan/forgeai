@@ -252,7 +252,7 @@ export function TasksPage() {
 
       {hasTasks && (
         <>
-          <div className="flex gap-1" role="tablist" aria-label="View">
+          <div className="flex gap-1" role="group" aria-label="View">
             {(
               [
                 ["board", "Board", SquareKanban],
@@ -261,8 +261,7 @@ export function TasksPage() {
             ).map(([value, label, Icon]) => (
               <button
                 key={value}
-                role="tab"
-                aria-selected={view === value}
+                aria-pressed={view === value}
                 onClick={() => setView(value)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",

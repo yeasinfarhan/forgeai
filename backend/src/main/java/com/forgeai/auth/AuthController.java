@@ -1,5 +1,6 @@
 package com.forgeai.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
@@ -32,8 +33,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request);
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        // With FORWARD_HEADERS_STRATEGY=native behind nginx, this is the client's address, not the proxy's.
+        return authService.login(request, httpRequest.getRemoteAddr());
     }
 
     @GetMapping("/me")
