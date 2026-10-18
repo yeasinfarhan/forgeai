@@ -11,8 +11,8 @@ only when the previous one is complete and reviewed.
 | 4     | Requirements                           | Complete    |
 | 5     | Architecture                           | Complete    |
 | 6     | Database & API design                  | Complete    |
-| 7     | Development tasks                      | Implemented |
-| 8     | Code generation                        | Planned     |
+| 7     | Development tasks                      | Complete    |
+| 8     | Code generation                        | Implemented |
 | 9     | Tests & code review                    | Planned     |
 | 10    | Documentation & export                 | Planned     |
 | 11    | Hardening & release                    | Planned     |
@@ -99,7 +99,7 @@ Delivered:
   requirements, data model and API.
 - Shared review workflow, revision history and change detection for both documents.
 
-## Phase 7 — Development tasks (implemented)
+## Phase 7 — Development tasks ✅
 
 Delivered:
 
@@ -111,11 +111,16 @@ Delivered:
   checks report anything no task implements and links that went stale.
 - Add, edit and delete tasks by hand; regeneration keeps started, edited and hand-written tasks.
 
-## Phase 8 — Code generation
+## Phase 8 — Code generation (implemented)
 
-- Generate code per task, using the approved design and existing generated code as context.
-- Diff view and per-file approval before code is accepted.
-- Export to a Git repository or downloadable archive.
+Delivered:
+
+- Code generated per task from the approved design, the task's details and the accepted code
+  (files from the tasks it depends on first); a task waits until its dependencies are done.
+- Every proposal is repaired (safe paths only, actions matching the workspace, no unchanged files).
+- Diff view with per-file accept / reject, accept all, discard; stale proposals cannot be accepted.
+- File browser over the accepted code and ZIP export. Git push is left out on purpose: it needs
+  stored repository credentials.
 
 ## Phase 9 — Tests & code review
 

@@ -64,7 +64,7 @@ public class GeminiClient extends HttpAiClient {
                 request.system() == null ? null : GeminiApi.Content.of(null, request.system()),
                 List.of(GeminiApi.Content.of("user", request.userMessage())),
                 new GeminiApi.GenerationConfig(
-                        properties.maxTokens(),
+                        request.maxTokensOr(properties.maxTokens()),
                         json ? "application/json" : null,
                         json ? GeminiSchemas.toResponseSchema(request.jsonSchema()) : null));
 
@@ -95,7 +95,7 @@ public class GeminiClient extends HttpAiClient {
         String finishReason = candidate.finishReason();
         if ("MAX_TOKENS".equals(finishReason)) {
             throw new AiException(AiFailure.BAD_RESPONSE,
-                    "Gemini hit maxOutputTokens=" + properties.maxTokens() + " for purpose=" + request.purpose());
+                    "Gemini hit maxOutputTokens=" + request.maxTokensOr(properties.maxTokens()) + " for purpose=" + request.purpose());
         }
         if (finishReason != null && BLOCKED_FINISH_REASONS.contains(finishReason)) {
             throw new AiException(AiFailure.REFUSED, "Gemini stopped with " + finishReason + " for purpose=" + request.purpose());

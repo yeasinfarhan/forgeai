@@ -269,6 +269,33 @@ implements. Lists are stored as one JSON column (`details_json`).
 | `task_events`   | Activity log per task (`CREATED`, `EDITED`, `STATUS_CHANGED`) |
 | `task_backlogs` | Model and input fingerprint of the latest generation          |
 
+### Code generation (`com.forgeai.code`)
+
+Code is generated one task at a time once the design is approved and the backlog exists. A task
+whose dependencies are not done is refused (`409`), so its code always builds on accepted code.
+
+- **Context**: the approved architecture, data model and API, the task (acceptance criteria,
+  linked requirements, entities, endpoints, components), the list of every accepted file, and the
+  contents of as many files as fit an 80 000-character budget — files written by the tasks this one
+  depends on first, then the most recently changed.
+- **Change sets**: the AI answers with structured JSON (summary plus files with path, action,
+  content, explanation). The proposal is repaired before it is stored: unsafe paths dropped
+  (absolute, `..`, `.git/`, `.env`), duplicates dropped, `update` of a missing file turned into
+  `create` and vice versa, unchanged files and deletions of missing files dropped, wrapping Markdown
+  fences removed. At most 25 files per proposal. Generating again replaces the task's pending proposal.
+- **Review**: each file change is accepted or rejected on its own (or all at once). Accepting
+  checks that the file still has the content the proposal was based on; if another change set
+  changed it in the meantime, accepting is refused and the task should be regenerated. When every
+  file is decided the change set is completed. Generating starts the task (to do → in progress).
+- **Export**: the accepted files as a ZIP (`<project-slug>/<path>`). Pushing to a Git repository
+  is not offered: it would need stored repository credentials.
+
+| Table             | Purpose                                                          |
+| ----------------- | ---------------------------------------------------------------- |
+| `code_files`      | Accepted code, one row per file (unique path per project)        |
+| `code_changesets` | One AI proposal per task generation (pending, completed, discarded) |
+| `code_changes`    | File changes in a proposal with base content, new content, decision |
+
 ### Configuration
 
 All environment-specific values come from environment variables (see `.env.example`). The

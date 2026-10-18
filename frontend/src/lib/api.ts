@@ -807,3 +807,140 @@ export function deleteTask(projectId: string, task: Task): Promise<BacklogOvervi
 export function getTaskEvents(projectId: string, task: Task): Promise<TaskEvent[]> {
   return apiRequest<TaskEvent[]>(tasksPath(projectId, `/${task.id}/events`));
 }
+
+// --- Code -------------------------------------------------------------------------
+
+export type ChangeAction = "CREATE" | "UPDATE" | "DELETE";
+export type ChangeDecision = "PENDING" | "ACCEPTED" | "REJECTED";
+export type ChangesetStatus = "PENDING" | "COMPLETED" | "DISCARDED";
+
+export interface CodeFileSummary {
+  path: string;
+  lines: number;
+  size: number;
+  lastTaskCode: string | null;
+  updatedAt: string;
+}
+
+export interface CodeFileContent {
+  path: string;
+  content: string;
+  lastTaskCode: string | null;
+  updatedAt: string;
+}
+
+export interface CodeTaskItem {
+  id: string;
+  code: string;
+  title: string;
+  status: TaskStatus;
+  blockedBy: string[];
+  pendingChangesetId: string | null;
+}
+
+export interface ChangesetSummary {
+  id: string;
+  taskId: string | null;
+  taskCode: string;
+  taskTitle: string;
+  status: ChangesetStatus;
+  summary: string;
+  pending: number;
+  accepted: number;
+  rejected: number;
+  createdAt: string;
+}
+
+export interface CodeChange {
+  id: string;
+  path: string;
+  action: ChangeAction;
+  baseContent: string | null;
+  newContent: string | null;
+  explanation: string;
+  decision: ChangeDecision;
+  /** The file changed after this was proposed; it can no longer be accepted. */
+  stale: boolean;
+  decidedAt: string | null;
+}
+
+export interface Changeset {
+  id: string;
+  taskId: string | null;
+  taskCode: string;
+  taskTitle: string;
+  status: ChangesetStatus;
+  summary: string;
+  model: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  changes: CodeChange[];
+}
+
+export interface CodeOverview {
+  files: CodeFileSummary[];
+  tasks: CodeTaskItem[];
+  changesets: ChangesetSummary[];
+  canGenerate: boolean;
+  blocker: string | null;
+}
+
+function codePath(projectId: string, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/code${suffix}`;
+}
+
+export function getCode(projectId: string, signal?: AbortSignal): Promise<CodeOverview> {
+  return apiRequest<CodeOverview>(codePath(projectId), { signal });
+}
+
+export function getCodeFile(projectId: string, path: string, signal?: AbortSignal): Promise<CodeFileContent> {
+  return apiRequest<CodeFileContent>(codePath(projectId, `/file?path=${encodeURIComponent(path)}`), { signal });
+}
+
+export function generateCode(projectId: string, taskId: string): Promise<Changeset> {
+  return apiRequest<Changeset>(codePath(projectId, `/tasks/${taskId}/generate`), { method: "POST" });
+}
+
+export function getChangeset(projectId: string, changesetId: string, signal?: AbortSignal): Promise<Changeset> {
+  return apiRequest<Changeset>(codePath(projectId, `/changesets/${changesetId}`), { signal });
+}
+
+export function decideChange(
+  projectId: string,
+  changesetId: string,
+  changeId: string,
+  decision: "accept" | "reject",
+): Promise<Changeset> {
+  return apiRequest<Changeset>(codePath(projectId, `/changesets/${changesetId}/changes/${changeId}/${decision}`), {
+    method: "POST",
+  });
+}
+
+export function acceptAllChanges(projectId: string, changesetId: string): Promise<Changeset> {
+  return apiRequest<Changeset>(codePath(projectId, `/changesets/${changesetId}/accept-all`), { method: "POST" });
+}
+
+export function discardChangeset(projectId: string, changesetId: string): Promise<Changeset> {
+  return apiRequest<Changeset>(codePath(projectId, `/changesets/${changesetId}/discard`), { method: "POST" });
+}
+
+export function codeExportPath(projectId: string) {
+  return codePath(projectId, "/export.zip");
+}
+
+/** A binary file from the API (e.g. a ZIP export), with the name the server suggests. */
+export async function downloadBinary(path: string): Promise<{ fileName: string; blob: Blob }> {
+  const headers: Record<string, string> = { Accept: "*/*" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { headers });
+  } catch {
+    throw new ApiError(0, "Could not reach the ForgeAI server. Check that the backend is running.");
+  }
+  if (response.status === 401 && accessToken) unauthorizedHandler?.();
+  if (!response.ok) throw await toApiError(response);
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  return { fileName: match?.[1] ?? "export.zip", blob: await response.blob() };
+}

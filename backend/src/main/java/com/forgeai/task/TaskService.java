@@ -173,6 +173,59 @@ public class TaskService {
                 .toList();
     }
 
+    // --- Used by code generation ---------------------------------------------------
+
+    /**
+     * A task as code generation sees it.
+     *
+     * @param blockedBy    tasks it depends on that are not done yet
+     * @param dependencies the tasks it depends on, as "T-002 Title"
+     */
+    public record CodeTask(
+            UUID id,
+            String code,
+            String title,
+            String description,
+            TaskType type,
+            TaskStatus status,
+            TaskDetails details,
+            List<String> blockedBy,
+            List<String> dependencies) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<CodeTask> codeTasks(UUID projectId) {
+        List<Task> all = tasks.findAllByProjectIdOrderByPositionAscSeqNumberAsc(projectId);
+        Map<String, Task> byCode = byCode(all);
+        return all.stream().map(t -> {
+            TaskDetails d = details(t);
+            return new CodeTask(t.getId(), t.code(), t.getTitle(), t.getDescription(), t.getType(), t.getStatus(), d,
+                    blockedBy(d, byCode),
+                    d.dependsOn().stream()
+                            .filter(byCode::containsKey)
+                            .map(c -> c + " " + byCode.get(c).getTitle())
+                            .toList());
+        }).toList();
+    }
+
+    /** Why later stages cannot build on the design yet (something not approved); null when they can. */
+    @Transactional(readOnly = true)
+    public String designBlocker(UUID projectId) {
+        return inputs(projectId).blocker();
+    }
+
+    /** Moves a task that is still to do to in progress (code is being written for it). */
+    @Transactional
+    public void markStarted(UUID projectId, UUID taskId) {
+        tasks.findByIdAndProjectId(taskId, projectId)
+                .filter(t -> t.getStatus() == TaskStatus.TODO)
+                .ifPresent(task -> {
+                    task.moveTo(TaskStatus.IN_PROGRESS);
+                    tasks.saveAndFlush(task);
+                    events.save(TaskEvent.statusChange(task, TaskStatus.TODO, TaskStatus.IN_PROGRESS));
+                });
+    }
+
     // --- Used by TaskGenerationService ------------------------------------------
 
     /** Everything generation reads, captured at one moment. */

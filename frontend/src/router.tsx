@@ -5,6 +5,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { AuthLayout } from "@/components/layout/auth-layout";
 import { ApiDesignPage } from "@/pages/api-design-page";
 import { ArchitecturePage } from "@/pages/architecture-page";
+import { CodePage } from "@/pages/code-page";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { DatabaseDesignPage } from "@/pages/database-design-page";
 import { LoginPage } from "@/pages/login-page";
@@ -41,6 +42,7 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/database-design", element: <DatabaseDesignPage />, handle: { title: "Database design" } },
       { path: "projects/:projectId/api-design", element: <ApiDesignPage />, handle: { title: "API design" } },
       { path: "projects/:projectId/tasks", element: <TasksPage />, handle: { title: "Development tasks" } },
+      { path: "projects/:projectId/code", element: <CodePage />, handle: { title: "Code" } },
       { path: "*", element: <NotFoundPage />, handle: { title: "Not found" } },
     ],
   },

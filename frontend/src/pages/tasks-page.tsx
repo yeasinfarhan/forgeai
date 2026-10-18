@@ -86,6 +86,9 @@ export function TasksPage() {
       setOverview(await action());
     } catch (error) {
       setActionError(errorMessage(error));
+      // The server may have finished or changed something anyway (e.g. a run that outlived the
+      // browser's wait): show its current state alongside the error.
+      await getBacklog(project.id).then(setOverview).catch(() => undefined);
     } finally {
       setBusy(null);
     }

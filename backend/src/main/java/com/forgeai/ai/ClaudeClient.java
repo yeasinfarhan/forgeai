@@ -50,7 +50,7 @@ public class ClaudeClient extends HttpAiClient {
     protected AiResult send(AiRequest request) {
         MessagesApi.Request body = new MessagesApi.Request(
                 settings().model(),
-                properties.maxTokens(),
+                request.maxTokensOr(properties.maxTokens()),
                 request.system(),
                 List.of(new MessagesApi.Message("user", request.userMessage())),
                 request.jsonSchema() == null
@@ -77,7 +77,7 @@ public class ClaudeClient extends HttpAiClient {
         }
         if ("max_tokens".equals(response.stopReason())) {
             throw new AiException(AiFailure.BAD_RESPONSE,
-                    "Claude hit max_tokens=" + properties.maxTokens() + " for purpose=" + request.purpose());
+                    "Claude hit max_tokens=" + request.maxTokensOr(properties.maxTokens()) + " for purpose=" + request.purpose());
         }
 
         String text = response.content().stream()

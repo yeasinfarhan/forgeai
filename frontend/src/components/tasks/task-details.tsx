@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Lock, Pencil, Trash2, X } from "lucide-react";
+import { Code2, Lock, Pencil, Trash2, X } from "lucide-react";
+import { Link } from "react-router";
 
 import { selectClass } from "@/components/design/editor-kit";
 import { FormError } from "@/components/form-field";
@@ -203,6 +204,12 @@ export function TaskDetailsPanel({
           ))}
         </select>
         <span className="mr-auto" />
+        <Button asChild variant="ghost" size="sm">
+          <Link to={`/projects/${projectId}/code?task=${task.id}`}>
+            <Code2 />
+            Code
+          </Link>
+        </Button>
         <Button variant="ghost" size="sm" disabled={busy} onClick={() => setMode("edit")}>
           <Pencil />
           Edit

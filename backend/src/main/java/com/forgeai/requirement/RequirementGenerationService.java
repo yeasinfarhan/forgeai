@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import com.forgeai.common.concurrent.GenerationGuard;
 import com.forgeai.common.exception.ConflictException;
 import com.forgeai.intake.IdeaIntakeService;
 import com.forgeai.intake.IntakeResponse;
@@ -28,8 +29,11 @@ public class RequirementGenerationService {
     private final RequirementService requirements;
     private final RequirementAssistant assistant;
 
+    private final GenerationGuard generationGuard;
+
     RequirementGenerationService(
-            ProjectService projects, IdeaIntakeService intake, RequirementService requirements, RequirementAssistant assistant) {
+            ProjectService projects, IdeaIntakeService intake, RequirementService requirements, RequirementAssistant assistant, GenerationGuard generationGuard) {
+        this.generationGuard = generationGuard;
         this.projects = projects;
         this.intake = intake;
         this.requirements = requirements;
@@ -37,6 +41,10 @@ public class RequirementGenerationService {
     }
 
     public RequirementsOverview generate(UUID ownerId, UUID projectId) {
+        return generationGuard.run(projectId, "requirements", "requirement list", () -> doGenerate(ownerId, projectId));
+    }
+
+    private RequirementsOverview doGenerate(UUID ownerId, UUID projectId) {
         projects.get(ownerId, projectId);
         IntakeResponse intakeState = intake.get(ownerId, projectId);
         if (intakeState.status() != IntakeStatus.BRIEF_READY || intakeState.brief() == null) {

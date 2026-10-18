@@ -18,7 +18,7 @@ const PIPELINE_STAGES: { name: string; detail: string; available?: boolean }[] =
   { name: "Database design", detail: "Entities, keys, ER diagram and SQL export", available: true },
   { name: "API design", detail: "Endpoints, contracts, error model and OpenAPI export", available: true },
   { name: "Development tasks", detail: "Ordered backlog and board, linked to the design", available: true },
-  { name: "Code", detail: "Implementation generated per task" },
+  { name: "Code", detail: "Generated per task, reviewed as diffs, exported as ZIP", available: true },
   { name: "Tests", detail: "Unit and integration test suites" },
   { name: "Code review", detail: "Automated review against the design" },
   { name: "Documentation", detail: "Developer and user-facing docs" },

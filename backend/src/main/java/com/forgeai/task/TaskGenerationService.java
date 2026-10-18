@@ -10,6 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
+import com.forgeai.common.concurrent.GenerationGuard;
 import com.forgeai.common.exception.ConflictException;
 import com.forgeai.design.api.ApiDesignContent;
 import com.forgeai.design.api.ApiDesignService;
@@ -31,13 +32,20 @@ public class TaskGenerationService {
     private final TaskService tasks;
     private final TaskAssistant assistant;
 
-    TaskGenerationService(ProjectService projects, TaskService tasks, TaskAssistant assistant) {
+    private final GenerationGuard generationGuard;
+
+    TaskGenerationService(ProjectService projects, TaskService tasks, TaskAssistant assistant, GenerationGuard generationGuard) {
+        this.generationGuard = generationGuard;
         this.projects = projects;
         this.tasks = tasks;
         this.assistant = assistant;
     }
 
     public BacklogOverview generate(UUID ownerId, UUID projectId) {
+        return generationGuard.run(projectId, "tasks", "backlog", () -> doGenerate(ownerId, projectId));
+    }
+
+    private BacklogOverview doGenerate(UUID ownerId, UUID projectId) {
         ProjectResponse project = projects.get(ownerId, projectId);
         TaskService.Inputs inputs = tasks.inputs(projectId);
         String blocker = inputs.blocker();
@@ -73,7 +81,7 @@ public class TaskGenerationService {
     }
 
     /** Endpoints as "METHOD /path" lines (the form tasks link to), with what they do. */
-    static String renderApi(ApiDesignContent api) {
+    public static String renderApi(ApiDesignContent api) {
         StringBuilder text = new StringBuilder("Base path: ").append(api.basePath()).append('\n');
         text.append("Authentication: ").append(api.authentication()).append('\n');
         for (ApiDesignContent.Endpoint e : api.endpoints()) {

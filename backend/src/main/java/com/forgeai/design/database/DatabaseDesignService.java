@@ -11,6 +11,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.forgeai.common.concurrent.GenerationGuard;
 import com.forgeai.architecture.ArchitectureDtos.RequirementRef;
 import com.forgeai.architecture.ArchitectureService;
 import com.forgeai.architecture.ArchitectureSnapshot;
@@ -56,6 +57,8 @@ public class DatabaseDesignService {
     private final DatabaseAssistant assistant;
     private final JsonMapper jsonMapper;
 
+    private final GenerationGuard generationGuard;
+
     DatabaseDesignService(
             ProjectService projects,
             RequirementService requirements,
@@ -63,7 +66,9 @@ public class DatabaseDesignService {
             DesignDocumentStore store,
             ConsistencyService consistency,
             DatabaseAssistant assistant,
-            JsonMapper jsonMapper) {
+            JsonMapper jsonMapper,
+            GenerationGuard generationGuard) {
+        this.generationGuard = generationGuard;
         this.projects = projects;
         this.requirements = requirements;
         this.architectures = architectures;
@@ -81,6 +86,10 @@ public class DatabaseDesignService {
 
     /** Generates (or regenerates, while in draft) the data model. Calls the AI; can take up to a minute. */
     public DatabaseDesignOverview generate(UUID ownerId, UUID projectId) {
+        return generationGuard.run(projectId, "database-design", "database design", () -> doGenerate(ownerId, projectId));
+    }
+
+    private DatabaseDesignOverview doGenerate(UUID ownerId, UUID projectId) {
         ProjectResponse project = projects.get(ownerId, projectId);
         Inputs inputs = inputs(projectId);
         Optional<DesignDocument> existing = store.find(projectId, KIND);

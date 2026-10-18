@@ -12,6 +12,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.forgeai.common.concurrent.GenerationGuard;
 import com.forgeai.architecture.ArchitectureDtos.RequirementRef;
 import com.forgeai.architecture.ArchitectureService;
 import com.forgeai.architecture.ArchitectureSnapshot;
@@ -61,6 +62,8 @@ public class ApiDesignService {
     private final ApiAssistant assistant;
     private final JsonMapper jsonMapper;
 
+    private final GenerationGuard generationGuard;
+
     ApiDesignService(
             ProjectService projects,
             RequirementService requirements,
@@ -69,7 +72,9 @@ public class ApiDesignService {
             DesignDocumentStore store,
             ConsistencyService consistency,
             ApiAssistant assistant,
-            JsonMapper jsonMapper) {
+            JsonMapper jsonMapper,
+            GenerationGuard generationGuard) {
+        this.generationGuard = generationGuard;
         this.projects = projects;
         this.requirements = requirements;
         this.architectures = architectures;
@@ -88,6 +93,10 @@ public class ApiDesignService {
 
     /** Generates (or regenerates, while in draft) the API. Calls the AI; can take up to a minute. */
     public ApiDesignOverview generate(UUID ownerId, UUID projectId) {
+        return generationGuard.run(projectId, "api-design", "API design", () -> doGenerate(ownerId, projectId));
+    }
+
+    private ApiDesignOverview doGenerate(UUID ownerId, UUID projectId) {
         ProjectResponse project = projects.get(ownerId, projectId);
         Inputs inputs = inputs(projectId);
         Optional<DesignDocument> existing = store.find(projectId, KIND);

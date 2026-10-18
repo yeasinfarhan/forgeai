@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router";
 
 import { FormError } from "@/components/form-field";
 import { ArchitectureSummaryCard } from "@/components/architecture/architecture-summary-card";
+import { CodeSummaryCard } from "@/components/code/code-summary-card";
 import { DesignSummaryCard } from "@/components/design/design-summary-card";
 import { IdeaIntakePanel } from "@/components/intake/idea-intake-panel";
 import { RequirementsSummaryCard } from "@/components/requirements/requirements-summary-card";
@@ -182,6 +183,8 @@ function ProjectDetail({ project, onUpdated }: { project: Project; onUpdated: (p
       <DesignSummaryCard projectId={project.id} />
 
       <TasksSummaryCard projectId={project.id} />
+
+      <CodeSummaryCard projectId={project.id} />
     </>
   );
 }

@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
+import com.forgeai.common.concurrent.GenerationGuard;
 import com.forgeai.architecture.ArchitectureDtos.ArchitectureOverview;
 import com.forgeai.common.exception.ConflictException;
 import com.forgeai.common.review.ReviewStatus;
@@ -33,12 +34,16 @@ public class ArchitectureGenerationService {
     private final ArchitectureService architectures;
     private final ArchitectureAssistant assistant;
 
+    private final GenerationGuard generationGuard;
+
     ArchitectureGenerationService(
             ProjectService projects,
             IdeaIntakeService intake,
             RequirementService requirements,
             ArchitectureService architectures,
-            ArchitectureAssistant assistant) {
+            ArchitectureAssistant assistant,
+            GenerationGuard generationGuard) {
+        this.generationGuard = generationGuard;
         this.projects = projects;
         this.intake = intake;
         this.requirements = requirements;
@@ -47,6 +52,10 @@ public class ArchitectureGenerationService {
     }
 
     public ArchitectureOverview generate(UUID ownerId, UUID projectId) {
+        return generationGuard.run(projectId, "architecture", "architecture", () -> doGenerate(ownerId, projectId));
+    }
+
+    private ArchitectureOverview doGenerate(UUID ownerId, UUID projectId) {
         ProjectResponse project = projects.get(ownerId, projectId);
 
         RequirementSnapshot snapshot = requirements.snapshot(projectId);
