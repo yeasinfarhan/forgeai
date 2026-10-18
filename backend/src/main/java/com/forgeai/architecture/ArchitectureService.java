@@ -27,6 +27,7 @@ import com.forgeai.common.exception.BadRequestException;
 import com.forgeai.common.exception.ConflictException;
 import com.forgeai.common.exception.ResourceNotFoundException;
 import com.forgeai.common.review.ReviewStatus;
+import com.forgeai.common.util.Fingerprints;
 import com.forgeai.project.ProjectService;
 import com.forgeai.requirement.RequirementDtos.RequirementResponse;
 import com.forgeai.requirement.RequirementService;
@@ -121,6 +122,15 @@ public class ArchitectureService {
                 .orElseThrow(() -> new ResourceNotFoundException("Revision " + revision + " not found."));
         return new RevisionDetail(r.getRevision(), r.getChangeType(), r.getStatus(), r.getModel(), r.getCreatedAt(),
                 read(r.getContentJson()));
+    }
+
+    // --- Used by later phases --------------------------------------------------
+
+    /** The current architecture of a project, if there is one. */
+    @Transactional(readOnly = true)
+    public Optional<ArchitectureSnapshot> snapshot(UUID projectId) {
+        return architectures.findById(projectId).map(a -> new ArchitectureSnapshot(
+                a.getStatus(), read(a.getContentJson()), Fingerprints.sha256(a.getContentJson())));
     }
 
     // --- Used by ArchitectureGenerationService ---------------------------------

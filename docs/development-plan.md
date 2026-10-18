@@ -9,9 +9,9 @@ only when the previous one is complete and reviewed.
 | 2     | Authentication & projects              | Complete    |
 | 3     | AI module & idea intake                | Complete    |
 | 4     | Requirements                           | Complete    |
-| 5     | Architecture                           | Implemented |
-| 6     | Database & API design                  | Planned     |
-| 7     | Development tasks                      | Planned     |
+| 5     | Architecture                           | Complete    |
+| 6     | Database & API design                  | Complete    |
+| 7     | Development tasks                      | Implemented |
 | 8     | Code generation                        | Planned     |
 | 9     | Tests & code review                    | Planned     |
 | 10    | Documentation & export                 | Planned     |
@@ -71,7 +71,7 @@ Delivered:
   approved, in-review, edited and hand-written requirements.
 - Optimistic locking so two tabs cannot silently overwrite each other.
 
-## Phase 5 — Architecture (implemented)
+## Phase 5 — Architecture ✅
 
 Delivered:
 
@@ -87,17 +87,29 @@ Delivered:
   read-only viewing, regeneration only in draft, and a warning when the approved requirements
   change after generation.
 
-## Phase 6 — Database & API design
+## Phase 6 — Database & API design ✅
 
-- Database design: entities, relationships, constraints; preview as an ER diagram; export as SQL.
-- API design: endpoints, request/response contracts and error model; export as OpenAPI.
-- Consistency checks between requirements, data model and API.
+Delivered:
 
-## Phase 7 — Development tasks
+- Database design from the approved architecture: entities, columns, keys, foreign keys, indexes,
+  defaults and allowed values; Mermaid ER diagram; PostgreSQL export, verified by running it in tests.
+- API design from the approved data model: conventions, error model, schemas and endpoints;
+  OpenAPI 3.1 export.
+- Section editors with blocking structural rules, and non-blocking consistency findings across
+  requirements, data model and API.
+- Shared review workflow, revision history and change detection for both documents.
 
-- Break the approved design into an ordered backlog of tasks with acceptance criteria and dependencies.
-- Task board with status tracking.
-- Each task links back to the requirements and design elements it implements.
+## Phase 7 — Development tasks (implemented)
+
+Delivered:
+
+- Ordered backlog generated from the approved design: tasks with type, story points, acceptance
+  criteria and dependencies; cycles refused, dependencies ordered first.
+- Board (to do / in progress / done) with drag and drop; a task starts only when its dependencies
+  are done. Backlog view with manual ordering. Activity log per task.
+- Every task links to the requirements, entities, endpoints and components it implements; coverage
+  checks report anything no task implements and links that went stale.
+- Add, edit and delete tasks by hand; regeneration keeps started, edited and hand-written tasks.
 
 ## Phase 8 — Code generation
 

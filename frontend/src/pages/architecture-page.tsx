@@ -236,7 +236,11 @@ export function ArchitecturePage() {
         <>
           {architecture.status === "APPROVED" && (
             <p className="rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-              The architecture is approved and locked. Reopen it to make changes.
+              The architecture is approved and locked. Reopen it to make changes. Next:{" "}
+              <Link to={`/projects/${project.id}/database-design`} className="underline hover:no-underline">
+                database design
+              </Link>
+              .
             </p>
           )}
           {architecture.requirementsChanged && (

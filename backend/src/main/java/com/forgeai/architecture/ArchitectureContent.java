@@ -31,6 +31,28 @@ public record ArchitectureContent(
     public static final int MAX_DECISIONS = 20;
     public static final int MAX_FLOWS = 6;
 
+    /** Plain-text rendering for AI prompts of later phases (diagrams left out). */
+    public String toPromptText() {
+        StringBuilder text = new StringBuilder();
+        text.append("Style: ").append(style).append(" (").append(styleRationale).append(")\n");
+        text.append("Overview: ").append(overview).append("\n");
+        text.append("Components:\n");
+        for (Component c : components) {
+            text.append("- ").append(c.name()).append(" [").append(c.kind());
+            if (c.technology() != null) text.append(", ").append(c.technology());
+            text.append("]: ").append(c.responsibility());
+            if (!c.dependsOn().isEmpty()) text.append(" Depends on: ").append(String.join(", ", c.dependsOn())).append('.');
+            text.append('\n');
+        }
+        if (!decisions.isEmpty()) {
+            text.append("Decisions:\n");
+            for (Decision d : decisions) {
+                text.append("- ").append(d.title()).append(": ").append(d.decision()).append('\n');
+            }
+        }
+        return text.toString().strip();
+    }
+
     /**
      * @param dependsOn    names of the components this one calls or reads from
      * @param requirements codes of the requirements this component helps satisfy (e.g. FR-001)

@@ -11,10 +11,10 @@ Idea → Requirements → Architecture → Database Design → API Design
 Claude acts as the reasoning engine. The application itself owns everything around it: projects,
 persistent context, approvals, tasks, generated artifacts and the development workflow.
 
-> **Status: Phase 5 — Architecture.** Users register, manage projects, turn an idea into a
-> structured project brief, generate and approve requirements, and from those an architecture
-> (components, decision records, Mermaid diagrams) with the same review workflow. Later stages are
-> planned in
+> **Status: Phase 7 — Development tasks.** Users register, manage projects, turn an idea into a
+> structured project brief, then generate, edit, review and approve requirements, an architecture,
+> a data model (ER diagram, SQL export) and an HTTP API (OpenAPI export), and break the approved
+> design into an ordered backlog tracked on a board. Later stages are planned in
 > [`docs/development-plan.md`](docs/development-plan.md).
 
 ---
@@ -40,13 +40,16 @@ forgeai/
 │   │   ├── ai/                  AI clients (Claude, Gemini), prompt templates, AI errors
 │   │   ├── architecture/        Architecture proposal: generation, editing, review workflow, history
 │   │   ├── auth/                Registration, login, JWT issuing
-│   │   ├── common/review/       Review workflow shared by requirements and architecture
+│   │   ├── common/review/       Review workflow shared by every reviewed stage
+│   │   ├── common/util/         Fingerprints (detect changed inputs)
+│   │   ├── design/              Database & API design: shared store, rules, SQL/OpenAPI export, consistency
 │   │   ├── common/security/     Current-user helper
 │   │   ├── config/              Security, JWT settings, startup database check
 │   │   ├── health/              GET /api/health
 │   │   ├── intake/              Idea intake: questions, answers, project brief
 │   │   ├── project/             Project CRUD
 │   │   ├── requirement/         Requirements: generation, editing, review workflow, history
+│   │   ├── task/                Development backlog: generation, dependencies, board, activity
 │   │   └── user/                User entity and repository
 │   ├── src/main/resources/
 │   │   ├── application.yml
@@ -59,9 +62,11 @@ forgeai/
 │   ├── src/
 │   │   ├── auth/                Session state, route guard
 │   │   ├── components/architecture/ Architecture sections, editors, Mermaid rendering, history
+│   │   ├── components/design/   Database & API design pages, editors, ER diagram, exports, findings
 │   │   ├── components/intake/   Idea intake panel, brief view
 │   │   ├── components/layout/   App shell: sidebar, header, layouts
 │   │   ├── components/requirements/ Requirement cards, form, summary card
+│   │   ├── components/tasks/    Task board, backlog order, task form and details
 │   │   ├── components/ui/       shadcn/ui components
 │   │   ├── hooks/               React hooks (API health polling)
 │   │   ├── lib/                 API client and utilities
@@ -252,6 +257,26 @@ curl http://localhost:8080/api/health
 | POST   | `/api/projects/{id}/architecture/status`          | ✓ | Move through draft → in review → approved   |
 | GET    | `/api/projects/{id}/architecture/revisions`       | ✓ | Revision history, newest first              |
 | GET    | `/api/projects/{id}/architecture/revisions/{n}`   | ✓ | One earlier revision with its full content  |
+| GET    | `/api/projects/{id}/database-design`              | ✓ | Data model (or null), readiness, consistency findings |
+| POST   | `/api/projects/{id}/database-design/generate`     | ✓ | Generate / regenerate (draft only) from the approved architecture |
+| PUT    | `/api/projects/{id}/database-design`              | ✓ | Save edited content (needs `version`)       |
+| POST   | `/api/projects/{id}/database-design/status`       | ✓ | Review workflow                             |
+| GET    | `/api/projects/{id}/database-design/revisions[/{n}]` | ✓ | History / one revision                   |
+| GET    | `/api/projects/{id}/database-design/export.sql`   | ✓ | PostgreSQL schema script (download)         |
+| GET    | `/api/projects/{id}/api-design`                   | ✓ | API design (or null), data model, findings  |
+| POST   | `/api/projects/{id}/api-design/generate`          | ✓ | Generate / regenerate (draft only) from the approved data model |
+| PUT    | `/api/projects/{id}/api-design`                   | ✓ | Save edited content (needs `version`)       |
+| POST   | `/api/projects/{id}/api-design/status`            | ✓ | Review workflow                             |
+| GET    | `/api/projects/{id}/api-design/revisions[/{n}]`   | ✓ | History / one revision                      |
+| GET    | `/api/projects/{id}/api-design/openapi.json`      | ✓ | OpenAPI 3.1 document (download)             |
+| GET    | `/api/projects/{id}/tasks`                        | ✓ | Backlog, counts, link targets, coverage findings |
+| POST   | `/api/projects/{id}/tasks/generate`               | ✓ | Generate / regenerate from the approved design |
+| POST   | `/api/projects/{id}/tasks`                        | ✓ | Add a task by hand → `201`                  |
+| PUT    | `/api/projects/{id}/tasks/{tid}`                  | ✓ | Edit (needs `version`)                      |
+| POST   | `/api/projects/{id}/tasks/{tid}/status`           | ✓ | Move on the board (dependencies must be done) |
+| POST   | `/api/projects/{id}/tasks/{tid}/move`             | ✓ | Move to another position in the backlog     |
+| DELETE | `/api/projects/{id}/tasks/{tid}`                  | ✓ | Delete (not while other tasks depend on it) |
+| GET    | `/api/projects/{id}/tasks/{tid}/events`           | ✓ | Activity log, newest first                  |
 
 Intake endpoints call Claude and can take up to a minute. AI failures return a problem detail with
 a `reason` (`NOT_CONFIGURED`, `RATE_LIMITED`, `TIMEOUT`, …) and a message safe to show users.

@@ -488,3 +488,322 @@ export function getArchitectureHistory(projectId: string): Promise<ArchitectureR
 export function getArchitectureRevision(projectId: string, revision: number): Promise<ArchitectureRevisionDetail> {
   return apiRequest<ArchitectureRevisionDetail>(architecturePath(projectId, `/revisions/${revision}`));
 }
+
+// --- Database & API design ---------------------------------------------------
+
+/** A design document with its review state. */
+export interface DesignState<T> {
+  status: ReviewStatus;
+  content: T;
+  model: string | null;
+  edited: boolean;
+  revision: number;
+  version: number;
+  /** The earlier stages it was generated from have changed since. */
+  inputsChanged: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Finding {
+  severity: "ERROR" | "WARNING";
+  area: "DATABASE" | "API" | "REQUIREMENTS" | "TASKS";
+  message: string;
+}
+
+/** What both design pages receive. */
+export interface StageOverview<T> {
+  design: DesignState<T> | null;
+  requirements: RequirementRef[];
+  canGenerate: boolean;
+  /** Why generating is not possible right now. */
+  blocker: string | null;
+  findings: Finding[];
+}
+
+export interface DesignRevisionSummary {
+  revision: number;
+  change: "GENERATED" | "EDITED" | "STATUS_CHANGED";
+  status: ReviewStatus;
+  model: string | null;
+  createdAt: string;
+}
+
+export interface DesignRevisionDetail<T> extends DesignRevisionSummary {
+  content: T;
+}
+
+export type ColumnType =
+  | "UUID"
+  | "TEXT"
+  | "VARCHAR"
+  | "INTEGER"
+  | "BIGINT"
+  | "DECIMAL"
+  | "BOOLEAN"
+  | "DATE"
+  | "TIMESTAMP"
+  | "JSON";
+
+export type OnDelete = "CASCADE" | "RESTRICT" | "SET_NULL";
+
+export interface DbColumn {
+  name: string;
+  type: ColumnType;
+  length: number | null;
+  precision: number | null;
+  scale: number | null;
+  nullable: boolean;
+  primaryKey: boolean;
+  unique: boolean;
+  defaultValue: string | null;
+  references: { entity: string; column: string; onDelete: OnDelete } | null;
+  allowedValues: string[];
+  description: string | null;
+}
+
+export interface DbIndex {
+  columns: string[];
+  unique: boolean;
+}
+
+export interface DbEntity {
+  name: string;
+  description: string | null;
+  columns: DbColumn[];
+  indexes: DbIndex[];
+  requirements: string[];
+}
+
+export interface DatabaseDesignContent {
+  summary: string;
+  entities: DbEntity[];
+}
+
+export type DatabaseDesignOverview = StageOverview<DatabaseDesignContent>;
+
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type FieldType = "STRING" | "INTEGER" | "NUMBER" | "BOOLEAN" | "UUID" | "DATE" | "DATE_TIME" | "EMAIL" | "OBJECT";
+
+export interface ApiErrorCase {
+  status: number;
+  code: string;
+  description: string;
+}
+
+export interface ApiField {
+  name: string;
+  type: FieldType;
+  /** Schema name, for OBJECT. */
+  ref: string | null;
+  array: boolean;
+  required: boolean;
+  description: string | null;
+}
+
+export interface ApiSchema {
+  name: string;
+  description: string | null;
+  entity: string | null;
+  fields: ApiField[];
+}
+
+export interface ApiParameter {
+  name: string;
+  type: FieldType;
+  required: boolean;
+  description: string | null;
+}
+
+export interface ApiEndpoint {
+  method: HttpMethod;
+  path: string;
+  summary: string;
+  description: string | null;
+  authenticated: boolean;
+  entity: string | null;
+  requestSchema: string | null;
+  responseSchema: string | null;
+  responseList: boolean;
+  successStatus: number;
+  pathParameters: ApiParameter[];
+  queryParameters: ApiParameter[];
+  errorStatuses: number[];
+  requirements: string[];
+}
+
+export interface ApiDesignContent {
+  summary: string;
+  basePath: string;
+  authentication: string;
+  errorFormat: string;
+  errors: ApiErrorCase[];
+  schemas: ApiSchema[];
+  endpoints: ApiEndpoint[];
+}
+
+export interface ApiDesignOverview extends StageOverview<ApiDesignContent> {
+  /** The current data model, for linking schemas and endpoints to entities. */
+  database: DatabaseDesignContent | null;
+}
+
+export type DesignStage = "database-design" | "api-design";
+
+function designPath(projectId: string, stage: DesignStage, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/${stage}${suffix}`;
+}
+
+export function getDesign<O>(projectId: string, stage: DesignStage, signal?: AbortSignal): Promise<O> {
+  return apiRequest<O>(designPath(projectId, stage), { signal });
+}
+
+export function generateDesign<O>(projectId: string, stage: DesignStage): Promise<O> {
+  return apiRequest<O>(designPath(projectId, stage, "/generate"), { method: "POST" });
+}
+
+export function updateDesign<O, T>(projectId: string, stage: DesignStage, design: DesignState<T>, content: T): Promise<O> {
+  return apiRequest<O>(designPath(projectId, stage), { method: "PUT", body: { content, version: design.version } });
+}
+
+export function changeDesignStatus<O, T>(
+  projectId: string,
+  stage: DesignStage,
+  design: DesignState<T>,
+  status: ReviewStatus,
+): Promise<O> {
+  return apiRequest<O>(designPath(projectId, stage, "/status"), { method: "POST", body: { status, version: design.version } });
+}
+
+export function getDesignHistory(projectId: string, stage: DesignStage): Promise<DesignRevisionSummary[]> {
+  return apiRequest<DesignRevisionSummary[]>(designPath(projectId, stage, "/revisions"));
+}
+
+export function getDesignRevision<T>(projectId: string, stage: DesignStage, revision: number): Promise<DesignRevisionDetail<T>> {
+  return apiRequest<DesignRevisionDetail<T>>(designPath(projectId, stage, `/revisions/${revision}`));
+}
+
+export function designExportPath(projectId: string, stage: DesignStage) {
+  return designPath(projectId, stage, stage === "database-design" ? "/export.sql" : "/openapi.json");
+}
+
+/** A file from the API (an export), with the name the server suggests. */
+export async function downloadFile(path: string): Promise<{ fileName: string; text: string }> {
+  const headers: Record<string, string> = { Accept: "*/*" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { headers });
+  } catch {
+    throw new ApiError(0, "Could not reach the ForgeAI server. Check that the backend is running.");
+  }
+  if (response.status === 401 && accessToken) unauthorizedHandler?.();
+  if (!response.ok) throw await toApiError(response);
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  return { fileName: match?.[1] ?? "export.txt", text: await response.text() };
+}
+
+// --- Development tasks ----------------------------------------------------------
+
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
+export type TaskType = "SETUP" | "DATABASE" | "BACKEND" | "FRONTEND" | "TESTING" | "DEVOPS" | "DOCUMENTATION";
+
+export interface Task {
+  id: string;
+  code: string;
+  position: number;
+  title: string;
+  description: string;
+  type: TaskType;
+  estimate: number | null;
+  status: TaskStatus;
+  source: "AI" | "USER";
+  edited: boolean;
+  acceptanceCriteria: string[];
+  dependsOn: string[];
+  requirements: string[];
+  entities: string[];
+  /** "METHOD /path", relative to the API base path. */
+  endpoints: string[];
+  components: string[];
+  /** Tasks it depends on that are not done yet. */
+  blockedBy: string[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskInput {
+  title: string;
+  description: string;
+  type: TaskType;
+  estimate: number | null;
+  acceptanceCriteria: string[];
+  dependsOn: string[];
+  requirements: string[];
+  entities: string[];
+  endpoints: string[];
+  components: string[];
+}
+
+export interface BacklogOverview {
+  tasks: Task[];
+  counts: { todo: number; inProgress: number; done: number; total: number; points: number; pointsDone: number };
+  /** What tasks can link to. */
+  refs: { requirements: RequirementRef[]; entities: string[]; endpoints: string[]; components: string[] };
+  canGenerate: boolean;
+  blocker: string | null;
+  generatedAt: string | null;
+  model: string | null;
+  inputsChanged: boolean;
+  findings: Finding[];
+}
+
+export interface TaskEvent {
+  type: "CREATED" | "EDITED" | "STATUS_CHANGED";
+  fromStatus: TaskStatus | null;
+  toStatus: TaskStatus | null;
+  createdAt: string;
+}
+
+function tasksPath(projectId: string, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/tasks${suffix}`;
+}
+
+export function getBacklog(projectId: string, signal?: AbortSignal): Promise<BacklogOverview> {
+  return apiRequest<BacklogOverview>(tasksPath(projectId), { signal });
+}
+
+export function generateTasks(projectId: string): Promise<BacklogOverview> {
+  return apiRequest<BacklogOverview>(tasksPath(projectId, "/generate"), { method: "POST" });
+}
+
+export function createTask(projectId: string, input: TaskInput): Promise<BacklogOverview> {
+  return apiRequest<BacklogOverview>(tasksPath(projectId), { method: "POST", body: input });
+}
+
+export function updateTask(projectId: string, task: Task, input: TaskInput): Promise<BacklogOverview> {
+  return apiRequest<BacklogOverview>(tasksPath(projectId, `/${task.id}`), { method: "PUT", body: { ...input, version: task.version } });
+}
+
+export function changeTaskStatus(projectId: string, task: Task, status: TaskStatus): Promise<BacklogOverview> {
+  return apiRequest<BacklogOverview>(tasksPath(projectId, `/${task.id}/status`), {
+    method: "POST",
+    body: { status, version: task.version },
+  });
+}
+
+export function moveTask(projectId: string, task: Task, position: number): Promise<BacklogOverview> {
+  return apiRequest<BacklogOverview>(tasksPath(projectId, `/${task.id}/move`), {
+    method: "POST",
+    body: { position, version: task.version },
+  });
+}
+
+export function deleteTask(projectId: string, task: Task): Promise<BacklogOverview> {
+  return apiRequest<BacklogOverview>(tasksPath(projectId, `/${task.id}`), { method: "DELETE" });
+}
+
+export function getTaskEvents(projectId: string, task: Task): Promise<TaskEvent[]> {
+  return apiRequest<TaskEvent[]>(tasksPath(projectId, `/${task.id}/events`));
+}

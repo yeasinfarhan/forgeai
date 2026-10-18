@@ -209,6 +209,66 @@ addresses each approved requirement) is computed on every read.
 | `architectures`          | Current architecture per project: status, content JSON, model, requirements fingerprint, revision |
 | `architecture_revisions` | Snapshot per change (`GENERATED`, `EDITED`, `STATUS_CHANGED`)     |
 
+### Database & API design (`com.forgeai.design`)
+
+Two JSON documents per project, stored in one table by kind (`DATABASE`, `API`) and handled by
+`DesignDocumentStore`: the same review workflow, optimistic locking and full revision history as
+the architecture. Each stage needs the previous one approved: the data model is generated from the
+approved architecture and requirements, the API from the approved data model. A fingerprint of the
+inputs is stored at generation; the page warns when they change later.
+
+- **Data model** (`design.database`): entities (snake_case tables) with typed columns (UUID, TEXT,
+  VARCHAR(n), INTEGER, BIGINT, DECIMAL(p,s), BOOLEAN, DATE, TIMESTAMP, JSON), primary keys, unique
+  columns, defaults from a closed set (`SqlDefaults`), allowed values, foreign keys with ON DELETE,
+  indexes and requirement codes. The ER diagram (Mermaid) is derived from the foreign keys.
+  `SqlExporter` writes a PostgreSQL script: tables, then foreign keys, then indexes; identifiers
+  are validated and quoted, constraint names stay within 63 characters. The test suite runs the
+  exported script against PostgreSQL.
+- **API** (`design.api`): base path, authentication, error format, the error model (statuses with
+  codes), schemas (PascalCase, camelCase fields, linked to entities) and endpoints (method, path,
+  path/query parameters, request/response schema, success status, error statuses, requirement
+  codes). `OpenApiExporter` produces OpenAPI 3.1 with RFC 9457 problem responses and a bearer scheme.
+
+Rules work in two levels. Structural mistakes block saving (`400` with `problems`): unknown
+references, duplicates, missing type parameters, path parameters that do not match the path, error
+statuses missing from the error model. Design issues are reported as findings by
+`ConsistencyService` without blocking: tables without a primary key, foreign keys to non-key
+columns or of another type, schema fields without a matching column, entities and schemas nothing
+uses, and functional requirements no entity or endpoint serves. AI output is repaired to satisfy
+the blocking rules before it is stored.
+
+| Table                       | Purpose                                                      |
+| --------------------------- | ------------------------------------------------------------ |
+| `design_documents`          | Current database and API design per project (unique per kind) |
+| `design_document_revisions` | Snapshot per change                                          |
+
+### Development tasks (`com.forgeai.task`)
+
+Generated once the API design is approved (and with it the data model, architecture and
+requirements). Each task has a stable code (`T-001`, never reused), a position in the backlog, a
+type, an estimate in story points (1, 2, 3, 5, 8, 13), acceptance criteria, dependencies on other
+tasks, and links to the requirements, entities, endpoints (`METHOD /path`) and components it
+implements. Lists are stored as one JSON column (`details_json`).
+
+- **Dependencies** are checked on every save: they must exist and must not form a cycle (`400`).
+  A task can only be started or finished once everything it depends on is done (`409`); the board
+  shows which tasks are waiting. A task others depend on cannot be deleted.
+- **Generation** asks the AI with the approved design as input, then repairs the result: unknown
+  links dropped, estimates snapped to the scale, dependencies that would form a cycle removed, and
+  the new tasks put in an order where every task follows its dependencies before they are numbered.
+  Regeneration replaces only AI tasks that are untouched and still to do; started, finished, edited
+  and hand-written tasks stay, are passed to the AI, and keep their codes.
+- **Findings** (non-blocking): links to design elements that no longer exist, tasks placed before
+  their dependencies, and endpoints, entities and functional requirements no task implements.
+- Every create, edit and status change is logged in `task_events`. A fingerprint of the approved
+  design is stored per generation in `task_backlogs`, so the page can say when the design changed.
+
+| Table           | Purpose                                                       |
+| --------------- | ------------------------------------------------------------- |
+| `tasks`         | Backlog tasks (unique code per project)                       |
+| `task_events`   | Activity log per task (`CREATED`, `EDITED`, `STATUS_CHANGED`) |
+| `task_backlogs` | Model and input fingerprint of the latest generation          |
+
 ### Configuration
 
 All environment-specific values come from environment variables (see `.env.example`). The
