@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, SquareKanban, ListOrdered, Plus, Sparkles, TriangleAlert } from "lucide-react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
 import { FindingsPanel } from "@/components/design/findings-panel";
 import { FormError } from "@/components/form-field";
@@ -39,7 +39,9 @@ export function TasksPage() {
   const { projectId = "" } = useParams();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [view, setView] = useState<View>("board");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // ?task= opens a task's details (links from the code review).
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("task"));
   const [adding, setAdding] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [busy, setBusy] = useState<{ message: string; slow: boolean } | null>(null);

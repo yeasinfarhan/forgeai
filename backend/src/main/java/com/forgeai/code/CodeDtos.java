@@ -20,13 +20,24 @@ public final class CodeDtos {
 
     /**
      * @param blockedBy tasks it depends on that are not done; code can be generated once this is empty
-     * @param pendingChangesetId the proposal waiting for review, if any
+     * @param pendingChangesetId the code proposal waiting for review, if any
+     * @param hasCode the task's accepted code is in the workspace, so tests can be generated for it
+     * @param pendingTestChangesetId the test proposal waiting for review, if any
      */
-    public record TaskItem(UUID id, String code, String title, TaskStatus status, List<String> blockedBy, UUID pendingChangesetId) {
+    public record TaskItem(
+            UUID id,
+            String code,
+            String title,
+            TaskStatus status,
+            List<String> blockedBy,
+            UUID pendingChangesetId,
+            boolean hasCode,
+            UUID pendingTestChangesetId) {
     }
 
     public record ChangesetSummary(
             UUID id,
+            ChangesetKind kind,
             UUID taskId,
             String taskCode,
             String taskTitle,
@@ -55,6 +66,7 @@ public final class CodeDtos {
 
     public record ChangesetResponse(
             UUID id,
+            ChangesetKind kind,
             UUID taskId,
             String taskCode,
             String taskTitle,

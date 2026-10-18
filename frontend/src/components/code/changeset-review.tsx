@@ -52,12 +52,16 @@ export function ChangesetReview({
   }
 
   return (
-    <section className="space-y-4 rounded-xl border bg-card p-5" aria-label={`Code for ${changeset.taskCode}`}>
+    <section
+      className="space-y-4 rounded-xl border bg-card p-5"
+      aria-label={`${changeset.kind === "TESTS" ? "Tests" : "Code"} for ${changeset.taskCode}`}
+    >
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs text-muted-foreground">{changeset.taskCode}</span>
             <h2 className="font-semibold">{changeset.taskTitle}</h2>
+            {changeset.kind === "TESTS" && <Badge variant="outline">Tests</Badge>}
             <StatusBadge status={changeset.status} />
           </div>
           <p className="text-sm text-muted-foreground">{changeset.summary}</p>
@@ -88,6 +92,7 @@ export function ChangesetReview({
             key={change.id}
             change={change}
             reviewing={reviewing}
+            regenerate={changeset.kind === "TESTS" ? "tests" : "code"}
             busy={busy}
             onDecide={(decision) => run(() => decideChange(projectId, changeset.id, change.id, decision))}
           />
@@ -106,11 +111,13 @@ function StatusBadge({ status }: { status: Changeset["status"] }) {
 function ChangeItem({
   change,
   reviewing,
+  regenerate,
   busy,
   onDecide,
 }: {
   change: CodeChange;
   reviewing: boolean;
+  regenerate: "code" | "tests";
   busy: boolean;
   onDecide: (decision: "accept" | "reject") => void;
 }) {
@@ -149,7 +156,7 @@ function ChangeItem({
       {change.stale && reviewing && change.decision === "PENDING" && (
         <p className="flex items-center gap-2 text-xs text-primary">
           <TriangleAlert className="size-3.5" />
-          This file changed after the proposal was made. Reject it and generate the task's code again.
+          This file changed after the proposal was made. Reject it and generate the task's {regenerate} again.
         </p>
       )}
       {open && <DiffView before={change.baseContent} after={change.newContent} />}

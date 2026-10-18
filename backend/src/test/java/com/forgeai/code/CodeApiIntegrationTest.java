@@ -212,6 +212,59 @@ class CodeApiIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    void testsAreGeneratedForAcceptedCodeAndLimitedToTestFiles() throws Exception {
+        approvedDesign();
+        String backlog = generateTasks();
+        String t1 = taskId(backlog, "T-001");
+        String t2 = taskId(backlog, "T-002");
+
+        when(ai.complete(any())).thenReturn(reply("""
+                {"summary": "Skeleton.", "files": [
+                  {"path": "backend/pom.xml", "action": "CREATE", "content": "<project/>", "explanation": "Build file."},
+                  {"path": "backend/src/main/java/App.java", "action": "CREATE", "content": "class App {}", "explanation": "App."}]}
+                """));
+        String code = ok(perform(post("/api/projects/{p}/code/tasks/{t}/generate", projectId, t1)));
+        perform(post("/api/projects/{p}/code/changesets/{c}/accept-all", projectId, JsonPath.<String>read(code, "$.id")))
+                .andExpect(status().isOk());
+        perform(get("/api/projects/{id}/code", projectId))
+                .andExpect(jsonPath("$.tasks[0].hasCode").value(true))
+                .andExpect(jsonPath("$.tasks[1].hasCode").value(false));
+
+        perform(post("/api/projects/{p}/code/tasks/{t}/tests", projectId, t2))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(
+                        "T-002 has no accepted code yet. Generate and accept its code first, then its tests."));
+
+        // Only test files and an update of an existing build file survive
+        when(ai.complete(any())).thenReturn(reply("""
+                {"summary": "Tests for the skeleton.", "files": [
+                  {"path": "backend/src/test/java/AppTest.java", "action": "CREATE", "content": "class AppTest {}", "explanation": "Test."},
+                  {"path": "backend/src/main/java/App.java", "action": "UPDATE", "content": "class App { int x; }", "explanation": "Not a test."},
+                  {"path": "backend/pom.xml", "action": "UPDATE", "content": "<project><junit/></project>", "explanation": "Test dependency."},
+                  {"path": "frontend/package.json", "action": "CREATE", "content": "{}", "explanation": "New build file."},
+                  {"path": "backend/src/test/java/Old.java", "action": "DELETE", "content": "", "explanation": "Delete."}]}
+                """));
+        String tests = ok(perform(post("/api/projects/{p}/code/tasks/{t}/tests", projectId, t1)));
+        assertThat(JsonPath.<String>read(tests, "$.kind")).isEqualTo("TESTS");
+        assertThat(JsonPath.<List<String>>read(tests, "$.changes[*].path"))
+                .containsExactly("backend/src/test/java/AppTest.java", "backend/pom.xml");
+        assertThat(JsonPath.<List<String>>read(tests, "$.changes[*].action")).containsExactly("CREATE", "UPDATE");
+
+        ArgumentCaptor<AiRequest> request = ArgumentCaptor.forClass(AiRequest.class);
+        org.mockito.Mockito.verify(ai, org.mockito.Mockito.atLeastOnce()).complete(request.capture());
+        assertThat(request.getValue().purpose()).isEqualTo("tests.generate");
+        assertThat(request.getValue().userMessage())
+                .contains("<task-files>\nbackend/pom.xml\nbackend/src/main/java/App.java\n</task-files>")
+                .contains("=== backend/src/main/java/App.java ===\nclass App {}");
+
+        perform(get("/api/projects/{id}/code", projectId))
+                .andExpect(jsonPath("$.changesets[0].kind").value("TESTS"))
+                .andExpect(jsonPath("$.changesets[1].kind").value("CODE"))
+                .andExpect(jsonPath("$.tasks[0].pendingTestChangesetId").value(JsonPath.<String>read(tests, "$.id")))
+                .andExpect(jsonPath("$.tasks[0].pendingChangesetId").doesNotExist());
+    }
+
+    @Test
     void otherUsersCannotSeeTheCode() throws Exception {
         String otherToken = registerUser();
         mockMvc.perform(get("/api/projects/{id}/code", projectId).header(HttpHeaders.AUTHORIZATION, bearer(otherToken)))

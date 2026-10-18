@@ -49,6 +49,12 @@ public class CodeController {
         return generation.generate(CurrentUser.id(jwt), projectId, taskId);
     }
 
+    /** Generates tests for the accepted code of a task (calls the AI; can take a few minutes). */
+    @PostMapping("/tasks/{taskId}/tests")
+    public ChangesetResponse generateTests(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId, @PathVariable UUID taskId) {
+        return generation.generateTests(CurrentUser.id(jwt), projectId, taskId);
+    }
+
     @GetMapping("/changesets/{changesetId}")
     public ChangesetResponse changeset(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID projectId, @PathVariable UUID changesetId) {
         return code.changeset(CurrentUser.id(jwt), projectId, changesetId);

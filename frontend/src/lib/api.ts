@@ -813,6 +813,8 @@ export function getTaskEvents(projectId: string, task: Task): Promise<TaskEvent[
 export type ChangeAction = "CREATE" | "UPDATE" | "DELETE";
 export type ChangeDecision = "PENDING" | "ACCEPTED" | "REJECTED";
 export type ChangesetStatus = "PENDING" | "COMPLETED" | "DISCARDED";
+/** A change set holds the code of a task, or tests for that code. */
+export type ChangesetKind = "CODE" | "TESTS";
 
 export interface CodeFileSummary {
   path: string;
@@ -836,10 +838,14 @@ export interface CodeTaskItem {
   status: TaskStatus;
   blockedBy: string[];
   pendingChangesetId: string | null;
+  /** The task's accepted code is in the workspace, so tests can be generated for it. */
+  hasCode: boolean;
+  pendingTestChangesetId: string | null;
 }
 
 export interface ChangesetSummary {
   id: string;
+  kind: ChangesetKind;
   taskId: string | null;
   taskCode: string;
   taskTitle: string;
@@ -866,6 +872,7 @@ export interface CodeChange {
 
 export interface Changeset {
   id: string;
+  kind: ChangesetKind;
   taskId: string | null;
   taskCode: string;
   taskTitle: string;
@@ -899,6 +906,10 @@ export function getCodeFile(projectId: string, path: string, signal?: AbortSigna
 
 export function generateCode(projectId: string, taskId: string): Promise<Changeset> {
   return apiRequest<Changeset>(codePath(projectId, `/tasks/${taskId}/generate`), { method: "POST" });
+}
+
+export function generateTests(projectId: string, taskId: string): Promise<Changeset> {
+  return apiRequest<Changeset>(codePath(projectId, `/tasks/${taskId}/tests`), { method: "POST" });
 }
 
 export function getChangeset(projectId: string, changesetId: string, signal?: AbortSignal): Promise<Changeset> {
@@ -943,4 +954,101 @@ export async function downloadBinary(path: string): Promise<{ fileName: string; 
   const disposition = response.headers.get("Content-Disposition") ?? "";
   const match = /filename="?([^";]+)"?/.exec(disposition);
   return { fileName: match?.[1] ?? "export.zip", blob: await response.blob() };
+}
+
+// --- Code review -------------------------------------------------------------------
+
+export type FindingSeverity = "HIGH" | "MEDIUM" | "LOW";
+export type FindingCategory =
+  | "CORRECTNESS"
+  | "SECURITY"
+  | "REQUIREMENTS"
+  | "DESIGN"
+  | "TESTING"
+  | "PERFORMANCE"
+  | "MAINTAINABILITY";
+export type FindingStatus = "OPEN" | "DISMISSED" | "TASK_CREATED";
+
+export interface ReviewFinding {
+  id: string;
+  severity: FindingSeverity;
+  category: FindingCategory;
+  path: string | null;
+  line: number | null;
+  title: string;
+  detail: string;
+  suggestion: string;
+  requirementCode: string | null;
+  taskType: TaskType;
+  status: FindingStatus;
+  /** The task created from the finding; null if none or if that task was deleted. */
+  taskId: string | null;
+  taskCode: string | null;
+  updatedAt: string;
+}
+
+export interface FindingCounts {
+  total: number;
+  high: number;
+  medium: number;
+  low: number;
+  open: number;
+  dismissed: number;
+  taskCreated: number;
+}
+
+export interface CodeReview {
+  id: string;
+  summary: string;
+  model: string | null;
+  createdAt: string;
+  /** How many files the model was shown; large projects are reviewed partly. */
+  filesReviewed: number;
+  filesTotal: number;
+  /** The accepted code changed since this review. */
+  outdated: boolean;
+  counts: FindingCounts;
+  findings: ReviewFinding[];
+}
+
+export interface ReviewSummary {
+  id: string;
+  createdAt: string;
+  model: string | null;
+  filesReviewed: number;
+  filesTotal: number;
+  counts: FindingCounts;
+}
+
+export interface ReviewOverview {
+  canReview: boolean;
+  blocker: string | null;
+  fileCount: number;
+  reviews: ReviewSummary[];
+  latest: CodeReview | null;
+}
+
+function reviewPath(projectId: string, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/reviews${suffix}`;
+}
+
+export function getReviews(projectId: string, signal?: AbortSignal): Promise<ReviewOverview> {
+  return apiRequest<ReviewOverview>(reviewPath(projectId), { signal });
+}
+
+export function getReview(projectId: string, reviewId: string, signal?: AbortSignal): Promise<CodeReview> {
+  return apiRequest<CodeReview>(reviewPath(projectId, `/${reviewId}`), { signal });
+}
+
+export function generateReview(projectId: string): Promise<CodeReview> {
+  return apiRequest<CodeReview>(reviewPath(projectId, "/generate"), { method: "POST" });
+}
+
+export function actOnFinding(
+  projectId: string,
+  reviewId: string,
+  findingId: string,
+  action: "task" | "dismiss" | "reopen",
+): Promise<CodeReview> {
+  return apiRequest<CodeReview>(reviewPath(projectId, `/${reviewId}/findings/${findingId}/${action}`), { method: "POST" });
 }

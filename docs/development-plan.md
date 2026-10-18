@@ -12,8 +12,8 @@ only when the previous one is complete and reviewed.
 | 5     | Architecture                           | Complete    |
 | 6     | Database & API design                  | Complete    |
 | 7     | Development tasks                      | Complete    |
-| 8     | Code generation                        | Implemented |
-| 9     | Tests & code review                    | Planned     |
+| 8     | Code generation                        | Complete    |
+| 9     | Tests & code review                    | Implemented |
 | 10    | Documentation & export                 | Planned     |
 | 11    | Hardening & release                    | Planned     |
 
@@ -111,7 +111,7 @@ Delivered:
   checks report anything no task implements and links that went stale.
 - Add, edit and delete tasks by hand; regeneration keeps started, edited and hand-written tasks.
 
-## Phase 8 — Code generation (implemented)
+## Phase 8 — Code generation ✅
 
 Delivered:
 
@@ -122,11 +122,16 @@ Delivered:
 - File browser over the accepted code and ZIP export. Git push is left out on purpose: it needs
   stored repository credentials.
 
-## Phase 9 — Tests & code review
+## Phase 9 — Tests & code review (implemented)
 
-- Generate unit and integration tests for accepted code.
-- AI code review against the architecture, requirements and coding standards, with actionable findings.
-- Findings can be turned into new tasks.
+Delivered:
+
+- Tests generated per task for its accepted code, as a change set reviewed file by file like code;
+  only test files (and test dependencies in existing build files) are accepted from the AI.
+- AI code review against the approved requirements, architecture, data model, API and coding
+  standards, with findings by severity and category, pointing at files and lines.
+- A finding becomes a backlog task in one click, or is dismissed (and can be reopened); reviews keep
+  their history and say when the code changed since.
 
 ## Phase 10 — Documentation & export
 

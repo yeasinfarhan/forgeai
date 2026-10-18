@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.springframework.stereotype.Component;
 
@@ -62,7 +63,8 @@ class CodeAssistant {
     }
 
     Generated generate(Design design, CodeTask task, Map<String, String> requirementTitles, List<WorkspaceFile> workspace) {
-        Context context = context(task, workspace);
+        Set<String> dependencyCodes = new HashSet<>(task.details().dependsOn());
+        Context context = context(workspace, f -> dependencyCodes.contains(f.lastTaskCode()), CONTEXT_BUDGET);
         String user = prompts.render("code-generate", Map.of(
                 "projectName", design.projectName(),
                 "architecture", design.architecture(),
@@ -71,8 +73,41 @@ class CodeAssistant {
                 "task", renderTask(task, requirementTitles),
                 "workspace", context.listing(),
                 "files", context.contents()));
+        return propose("code.generate", "code-system", user, workspace, p -> true,
+                "The model proposed no usable file changes for " + task.code(), "Code for " + task.code() + ".");
+    }
 
-        AiResult result = ai.complete(new AiRequest("code.generate", prompts.render("code-system", Map.of()), user,
+    /**
+     * Asks for tests of the code a task wrote. The proposal may only create or update test files
+     * (and update an existing build file to add test dependencies); everything else is dropped.
+     *
+     * @param taskPaths the accepted files the task's code wrote, shown to the model first
+     */
+    Generated generateTests(Design design, CodeTask task, Map<String, String> requirementTitles, List<WorkspaceFile> workspace,
+            Set<String> taskPaths) {
+        Context context = context(workspace, f -> taskPaths.contains(f.path()), CONTEXT_BUDGET);
+        String user = prompts.render("tests-generate", Map.of(
+                "projectName", design.projectName(),
+                "architecture", design.architecture(),
+                "database", design.database(),
+                "api", design.api(),
+                "task", renderTask(task, requirementTitles),
+                "taskFiles", String.join("\n", taskPaths.stream().sorted().toList()),
+                "workspace", context.listing(),
+                "files", context.contents()));
+        return propose("tests.generate", "tests-system", user, workspace, CodeAssistant::allowedInTests,
+                "The model proposed no usable test files for " + task.code(), "Tests for " + task.code() + ".");
+    }
+
+    /** Test proposals touch test files only, plus updates of existing build files for test dependencies. */
+    static boolean allowedInTests(Proposed p) {
+        if (p.action() == ChangeAction.DELETE) return false;
+        return CodePaths.isTestFile(p.path()) || (p.action() == ChangeAction.UPDATE && CodePaths.isBuildFile(p.path()));
+    }
+
+    private Generated propose(String purpose, String systemPrompt, String user, List<WorkspaceFile> workspace,
+            Predicate<Proposed> allowed, String emptyMessage, String defaultSummary) {
+        AiResult result = ai.complete(new AiRequest(purpose, prompts.render(systemPrompt, Map.of()), user,
                 CodeSchemas.GENERATED, MAX_OUTPUT_TOKENS));
         Payload payload;
         try {
@@ -82,12 +117,10 @@ class CodeAssistant {
         }
         Map<String, String> current = new LinkedHashMap<>();
         workspace.forEach(f -> current.put(f.path(), f.content()));
-        List<Proposed> changes = repair(payload, current);
-        if (changes.isEmpty()) {
-            throw new AiException(AiFailure.BAD_RESPONSE, "The model proposed no usable file changes for " + task.code());
-        }
+        List<Proposed> changes = repair(payload, current, allowed);
+        if (changes.isEmpty()) throw new AiException(AiFailure.BAD_RESPONSE, emptyMessage);
         String summary = payload.summary() == null || payload.summary().isBlank()
-                ? "Code for " + task.code() + "." : truncate(payload.summary(), 4_000);
+                ? defaultSummary : truncate(payload.summary(), 4_000);
         return new Generated(summary, changes, result.model());
     }
 
@@ -98,6 +131,10 @@ class CodeAssistant {
     }
 
     static List<Proposed> repair(Payload payload, Map<String, String> current) {
+        return repair(payload, current, p -> true);
+    }
+
+    static List<Proposed> repair(Payload payload, Map<String, String> current, Predicate<Proposed> allowed) {
         List<Proposed> changes = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (FileItem item : payload.files() == null ? List.<FileItem>of() : payload.files()) {
@@ -110,17 +147,18 @@ class CodeAssistant {
             String explanation = item.explanation() == null || item.explanation().isBlank()
                     ? "Changed for this task." : truncate(item.explanation(), 1_000);
 
+            Proposed proposed = null;
             if (action == ChangeAction.DELETE) {
-                if (base != null) changes.add(new Proposed(path, ChangeAction.DELETE, base, null, explanation));
-                continue;
+                if (base != null) proposed = new Proposed(path, ChangeAction.DELETE, base, null, explanation);
+            } else if (!content.isBlank() && content.length() <= MAX_FILE_CHARS) {
+                if (!content.endsWith("\n")) content = content + "\n";
+                if (base == null) {
+                    proposed = new Proposed(path, ChangeAction.CREATE, null, content, explanation);
+                } else if (!base.equals(content)) {
+                    proposed = new Proposed(path, ChangeAction.UPDATE, base, content, explanation);
+                }
             }
-            if (content.isBlank() || content.length() > MAX_FILE_CHARS) continue;
-            if (!content.endsWith("\n")) content = content + "\n";
-            if (base == null) {
-                changes.add(new Proposed(path, ChangeAction.CREATE, null, content, explanation));
-            } else if (!base.equals(content)) {
-                changes.add(new Proposed(path, ChangeAction.UPDATE, base, content, explanation));
-            }
+            if (proposed != null && allowed.test(proposed)) changes.add(proposed);
         }
         return changes;
     }
@@ -131,15 +169,15 @@ class CodeAssistant {
     }
 
     /**
-     * Lists every file and includes as much content as the budget allows: first the files written
-     * by the tasks this one depends on, then the most recently changed ones.
+     * Lists every file and includes as much content as the budget allows: first the files
+     * {@code first} selects (for code: written by the tasks this one depends on; for tests: written
+     * by the task itself), then the most recently changed ones.
      */
-    static Context context(CodeTask task, List<WorkspaceFile> workspace) {
+    static Context context(List<WorkspaceFile> workspace, Predicate<WorkspaceFile> first, int budget) {
         if (workspace.isEmpty()) return new Context("(empty: this is the first code of the project)", "(none)");
-        Set<String> dependencyCodes = new HashSet<>(task.details().dependsOn());
         List<WorkspaceFile> ordered = new ArrayList<>(workspace);
         ordered.sort(Comparator
-                .comparing((WorkspaceFile f) -> !dependencyCodes.contains(f.lastTaskCode()))
+                .comparing((WorkspaceFile f) -> !first.test(f))
                 .thenComparing(WorkspaceFile::updatedAt, Comparator.reverseOrder()));
 
         Set<String> included = new HashSet<>();
@@ -147,7 +185,7 @@ class CodeAssistant {
         int used = 0;
         for (WorkspaceFile file : ordered) {
             int size = file.content().length() + file.path().length() + 10;
-            if (used + size > CONTEXT_BUDGET) continue;
+            if (used + size > budget) continue;
             contents.append("=== ").append(file.path()).append(" ===\n").append(file.content());
             if (!file.content().endsWith("\n")) contents.append('\n');
             contents.append('\n');

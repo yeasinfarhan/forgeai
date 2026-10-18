@@ -12,5 +12,5 @@ interface CodeChangesetRepository extends JpaRepository<CodeChangeset, UUID> {
 
     Optional<CodeChangeset> findByIdAndProjectId(UUID id, UUID projectId);
 
-    List<CodeChangeset> findAllByProjectIdAndTaskIdAndStatus(UUID projectId, UUID taskId, ChangesetStatus status);
+    List<CodeChangeset> findAllByProjectIdAndTaskIdAndKindAndStatus(UUID projectId, UUID taskId, ChangesetKind kind, ChangesetStatus status);
 }

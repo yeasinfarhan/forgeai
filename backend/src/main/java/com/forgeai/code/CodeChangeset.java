@@ -15,7 +15,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/** The AI's proposed code for one task, reviewed file by file. */
+/** The AI's proposed code (or tests) for one task, reviewed file by file. */
 @Entity
 @Table(name = "code_changesets")
 public class CodeChangeset {
@@ -35,6 +35,10 @@ public class CodeChangeset {
 
     @Column(name = "task_title", nullable = false, length = 200, updatable = false)
     private String taskTitle;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10, updatable = false)
+    private ChangesetKind kind;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -60,8 +64,9 @@ public class CodeChangeset {
         // Required by JPA
     }
 
-    CodeChangeset(UUID projectId, UUID taskId, String taskCode, String taskTitle, String summary, String model) {
+    CodeChangeset(UUID projectId, ChangesetKind kind, UUID taskId, String taskCode, String taskTitle, String summary, String model) {
         this.projectId = projectId;
+        this.kind = kind;
         this.taskId = taskId;
         this.taskCode = taskCode;
         this.taskTitle = taskTitle;
@@ -86,6 +91,10 @@ public class CodeChangeset {
 
     public UUID getProjectId() {
         return projectId;
+    }
+
+    public ChangesetKind getKind() {
+        return kind;
     }
 
     public UUID getTaskId() {

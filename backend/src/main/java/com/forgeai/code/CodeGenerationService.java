@@ -1,6 +1,7 @@
 package com.forgeai.code;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -67,32 +68,62 @@ public class CodeGenerationService {
         return generationGuard.run(projectId, "code/" + taskId, "code for this task", () -> doGenerate(ownerId, projectId, taskId));
     }
 
+    /** Generates tests for the accepted code of a task, as a change set of test files. */
+    public ChangesetResponse generateTests(UUID ownerId, UUID projectId, UUID taskId) {
+        return generationGuard.run(projectId, "tests/" + taskId, "tests for this task", () -> doGenerateTests(ownerId, projectId, taskId));
+    }
+
     private ChangesetResponse doGenerate(UUID ownerId, UUID projectId, UUID taskId) {
         ProjectResponse project = projects.get(ownerId, projectId);
-        var codeTasks = tasks.codeTasks(projectId);
-        String blocker = code.blocker(projectId, codeTasks);
-        if (blocker != null) throw new ConflictException(blocker);
-        CodeTask task = codeTasks.stream().filter(t -> t.id().equals(taskId)).findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
+        CodeTask task = task(projectId, taskId);
         if (!task.blockedBy().isEmpty()) {
             throw new ConflictException(task.code() + " is waiting for " + String.join(", ", task.blockedBy())
                     + " to be done. Finish those first, so their code is accepted and can be built on.");
         }
+        CodeAssistant.Generated generated = assistant.generate(design(project), task, requirementTitles(projectId), code.workspace(projectId));
+        return store(projectId, task, ChangesetKind.CODE, generated);
+    }
 
-        CodeAssistant.Design design = new CodeAssistant.Design(
+    private ChangesetResponse doGenerateTests(UUID ownerId, UUID projectId, UUID taskId) {
+        ProjectResponse project = projects.get(ownerId, projectId);
+        CodeTask task = task(projectId, taskId);
+        Set<String> taskPaths = code.taskPaths(projectId, taskId);
+        if (taskPaths.isEmpty()) {
+            throw new ConflictException(task.code() + " has no accepted code yet. Generate and accept its code first, then its tests.");
+        }
+        CodeAssistant.Generated generated = assistant.generateTests(design(project), task, requirementTitles(projectId),
+                code.workspace(projectId), taskPaths);
+        return store(projectId, task, ChangesetKind.TESTS, generated);
+    }
+
+    private CodeTask task(UUID projectId, UUID taskId) {
+        var codeTasks = tasks.codeTasks(projectId);
+        String blocker = code.blocker(projectId, codeTasks);
+        if (blocker != null) throw new ConflictException(blocker);
+        return codeTasks.stream().filter(t -> t.id().equals(taskId)).findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found."));
+    }
+
+    private CodeAssistant.Design design(ProjectResponse project) {
+        UUID projectId = project.id();
+        return new CodeAssistant.Design(
                 project.name(),
                 architectures.snapshot(projectId).orElseThrow().content().toPromptText(),
                 ApiDesignService.renderDatabase(databases.snapshot(projectId).orElseThrow().content()),
                 TaskGenerationService.renderApi(apis.snapshot(projectId).orElseThrow().content()));
-        Map<String, String> requirementTitles = requirements.snapshot(projectId).approved().stream()
-                .collect(Collectors.toMap(RequirementResponse::code, RequirementResponse::title));
+    }
 
-        CodeAssistant.Generated generated = assistant.generate(design, task, requirementTitles, code.workspace(projectId));
+    private Map<String, String> requirementTitles(UUID projectId) {
+        return requirements.snapshot(projectId).approved().stream()
+                .collect(Collectors.toMap(RequirementResponse::code, RequirementResponse::title));
+    }
+
+    private ChangesetResponse store(UUID projectId, CodeTask task, ChangesetKind kind, CodeAssistant.Generated generated) {
         CodeChangeset changeset;
         try {
-            changeset = code.store(projectId, task, generated);
+            changeset = code.store(projectId, task, kind, generated);
         } catch (DataIntegrityViolationException ex) {
-            throw new ConflictException("The task changed while its code was being generated. Reload and try again.");
+            throw new ConflictException("The task changed while this was being generated. Reload and try again.");
         }
         return code.response(projectId, changeset.getId());
     }

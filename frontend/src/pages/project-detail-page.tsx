@@ -8,6 +8,7 @@ import { CodeSummaryCard } from "@/components/code/code-summary-card";
 import { DesignSummaryCard } from "@/components/design/design-summary-card";
 import { IdeaIntakePanel } from "@/components/intake/idea-intake-panel";
 import { RequirementsSummaryCard } from "@/components/requirements/requirements-summary-card";
+import { ReviewSummaryCard } from "@/components/review/review-summary-card";
 import { TasksSummaryCard } from "@/components/tasks/tasks-summary-card";
 import { ProjectForm } from "@/components/project-form";
 import { Button } from "@/components/ui/button";
@@ -185,6 +186,8 @@ function ProjectDetail({ project, onUpdated }: { project: Project; onUpdated: (p
       <TasksSummaryCard projectId={project.id} />
 
       <CodeSummaryCard projectId={project.id} />
+
+      <ReviewSummaryCard projectId={project.id} />
     </>
   );
 }

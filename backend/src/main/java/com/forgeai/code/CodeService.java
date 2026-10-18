@@ -4,10 +4,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -65,20 +69,26 @@ public class CodeService {
         List<CodeChangeset> all = changesets.findAllByProjectIdOrderByCreatedAtDesc(projectId);
         Map<UUID, List<CodeChange>> changesBySet = changes.findAllByChangesetIdIn(all.stream().map(CodeChangeset::getId).toList())
                 .stream().collect(Collectors.groupingBy(CodeChange::getChangesetId));
-        Map<UUID, UUID> pendingByTask = new HashMap<>();
+        Map<UUID, UUID> pendingCode = new HashMap<>();
+        Map<UUID, UUID> pendingTests = new HashMap<>();
         all.stream()
                 .filter(c -> c.getStatus() == ChangesetStatus.PENDING && c.getTaskId() != null)
-                .forEach(c -> pendingByTask.putIfAbsent(c.getTaskId(), c.getId()));
+                .forEach(c -> (c.getKind() == ChangesetKind.CODE ? pendingCode : pendingTests).putIfAbsent(c.getTaskId(), c.getId()));
+        List<CodeFile> workspaceFiles = files.findAllByProjectIdOrderByPathAsc(projectId);
+        Set<String> existing = workspaceFiles.stream().map(CodeFile::getPath).collect(Collectors.toSet());
+        Map<UUID, Set<String>> writtenByTask = writtenByTask(all, changesBySet);
 
         List<CodeTask> codeTasks = tasks.codeTasks(projectId);
         String blocker = blocker(projectId, codeTasks);
         return new CodeOverview(
-                files.findAllByProjectIdOrderByPathAsc(projectId).stream()
+                workspaceFiles.stream()
                         .map(f -> new FileSummary(f.getPath(), CodeAssistant.lines(f.getContent()),
                                 f.getContent().getBytes(StandardCharsets.UTF_8).length, f.getLastTaskCode(), f.getUpdatedAt()))
                         .toList(),
                 codeTasks.stream()
-                        .map(t -> new TaskItem(t.id(), t.code(), t.title(), t.status(), t.blockedBy(), pendingByTask.get(t.id())))
+                        .map(t -> new TaskItem(t.id(), t.code(), t.title(), t.status(), t.blockedBy(), pendingCode.get(t.id()),
+                                writtenByTask.getOrDefault(t.id(), Set.of()).stream().anyMatch(existing::contains),
+                                pendingTests.get(t.id())))
                         .toList(),
                 all.stream().map(c -> summary(c, changesBySet.getOrDefault(c.getId(), List.of()))).toList(),
                 blocker == null,
@@ -175,6 +185,35 @@ public class CodeService {
         return null;
     }
 
+    /**
+     * The accepted files a task's code wrote (created or updated) that still exist: what tests for
+     * the task should cover.
+     */
+    @Transactional(readOnly = true)
+    public Set<String> taskPaths(UUID projectId, UUID taskId) {
+        List<CodeChangeset> all = changesets.findAllByProjectIdOrderByCreatedAtDesc(projectId).stream()
+                .filter(c -> taskId.equals(c.getTaskId()))
+                .toList();
+        Map<UUID, List<CodeChange>> changesBySet = changes.findAllByChangesetIdIn(all.stream().map(CodeChangeset::getId).toList())
+                .stream().collect(Collectors.groupingBy(CodeChange::getChangesetId));
+        Set<String> existing = files.findAllByProjectIdOrderByPathAsc(projectId).stream()
+                .map(CodeFile::getPath).collect(Collectors.toSet());
+        Set<String> written = new TreeSet<>(writtenByTask(all, changesBySet).getOrDefault(taskId, Set.of()));
+        written.retainAll(existing);
+        return written;
+    }
+
+    /** An accepted file, for the code review. */
+    public record SourceFile(String path, String content, String lastTaskCode, Instant updatedAt) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<SourceFile> sourceFiles(UUID projectId) {
+        return files.findAllByProjectIdOrderByPathAsc(projectId).stream()
+                .map(f -> new SourceFile(f.getPath(), f.getContent(), f.getLastTaskCode(), f.getUpdatedAt()))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<CodeAssistant.WorkspaceFile> workspace(UUID projectId) {
         return files.findAllByProjectIdOrderByPathAsc(projectId).stream()
@@ -183,24 +222,25 @@ public class CodeService {
     }
 
     /**
-     * Stores a new proposal for a task, replacing any proposal for it still waiting for review,
-     * and moves the task to in progress if it was still to do.
+     * Stores a new proposal for a task, replacing any proposal of the same kind for it still
+     * waiting for review. Code (not tests) moves the task to in progress if it was still to do.
      */
     @Transactional
-    public CodeChangeset store(UUID projectId, CodeTask task, CodeAssistant.Generated generated) {
-        for (CodeChangeset previous : changesets.findAllByProjectIdAndTaskIdAndStatus(projectId, task.id(), ChangesetStatus.PENDING)) {
+    public CodeChangeset store(UUID projectId, CodeTask task, ChangesetKind kind, CodeAssistant.Generated generated) {
+        for (CodeChangeset previous : changesets.findAllByProjectIdAndTaskIdAndKindAndStatus(
+                projectId, task.id(), kind, ChangesetStatus.PENDING)) {
             previous.finish(ChangesetStatus.DISCARDED);
             changesets.save(previous);
         }
         CodeChangeset changeset = changesets.saveAndFlush(
-                new CodeChangeset(projectId, task.id(), task.code(), task.title(), generated.summary(), generated.model()));
+                new CodeChangeset(projectId, kind, task.id(), task.code(), task.title(), generated.summary(), generated.model()));
         List<CodeAssistant.Proposed> proposed = generated.changes();
         for (int i = 0; i < proposed.size(); i++) {
             CodeAssistant.Proposed p = proposed.get(i);
             changes.save(new CodeChange(changeset.getId(), i, p.path(), p.action(), p.baseContent(), p.newContent(), p.explanation()));
         }
         changes.flush();
-        tasks.markStarted(projectId, task.id());
+        if (kind == ChangesetKind.CODE) tasks.markStarted(projectId, task.id());
         return changeset;
     }
 
@@ -215,7 +255,7 @@ public class CodeService {
         CodeFile current = files.findByProjectIdAndPath(changeset.getProjectId(), change.getPath()).orElse(null);
         if (stale(change, current)) {
             throw new ConflictException(change.getPath() + " changed after this proposal was made. "
-                    + "Reject it and generate the task's code again.");
+                    + "Reject it and generate the task's " + (changeset.getKind() == ChangesetKind.TESTS ? "tests" : "code") + " again.");
         }
         switch (change.getAction()) {
             case CREATE -> files.save(new CodeFile(changeset.getProjectId(), change.getPath(), change.getNewContent(), changeset.getTaskCode()));
@@ -278,9 +318,23 @@ public class CodeService {
             list.add(new ChangeResponse(c.getId(), c.getPath(), c.getAction(), c.getBaseContent(), c.getNewContent(),
                     c.getExplanation(), c.getDecision(), stale, c.getDecidedAt()));
         }
-        return new ChangesetResponse(changeset.getId(), changeset.getTaskId(), changeset.getTaskCode(), changeset.getTaskTitle(),
+        return new ChangesetResponse(changeset.getId(), changeset.getKind(), changeset.getTaskId(), changeset.getTaskCode(), changeset.getTaskTitle(),
                 changeset.getStatus(), changeset.getSummary(), changeset.getModel(), changeset.getCreatedAt(),
                 changeset.getCompletedAt(), list);
+    }
+
+    /** Per task, the paths its accepted code changes created or updated. */
+    private static Map<UUID, Set<String>> writtenByTask(List<CodeChangeset> all, Map<UUID, List<CodeChange>> changesBySet) {
+        Map<UUID, Set<String>> written = new HashMap<>();
+        for (CodeChangeset c : all) {
+            if (c.getKind() != ChangesetKind.CODE || c.getTaskId() == null) continue;
+            for (CodeChange change : changesBySet.getOrDefault(c.getId(), List.of())) {
+                if (change.getDecision() == ChangeDecision.ACCEPTED && change.getAction() != ChangeAction.DELETE) {
+                    written.computeIfAbsent(c.getTaskId(), id -> new HashSet<>()).add(change.getPath());
+                }
+            }
+        }
+        return written;
     }
 
     private static ChangesetSummary summary(CodeChangeset c, List<CodeChange> list) {
@@ -294,7 +348,7 @@ public class CodeService {
                 case REJECTED -> rejected++;
             }
         }
-        return new ChangesetSummary(c.getId(), c.getTaskId(), c.getTaskCode(), c.getTaskTitle(), c.getStatus(), c.getSummary(),
+        return new ChangesetSummary(c.getId(), c.getKind(), c.getTaskId(), c.getTaskCode(), c.getTaskTitle(), c.getStatus(), c.getSummary(),
                 pending, accepted, rejected, c.getCreatedAt());
     }
 }

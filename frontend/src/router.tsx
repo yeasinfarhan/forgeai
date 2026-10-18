@@ -15,6 +15,7 @@ import { ProjectDetailPage } from "@/pages/project-detail-page";
 import { ProjectsPage } from "@/pages/projects-page";
 import { RegisterPage } from "@/pages/register-page";
 import { RequirementsPage } from "@/pages/requirements-page";
+import { ReviewPage } from "@/pages/review-page";
 import { TasksPage } from "@/pages/tasks-page";
 
 export const router = createBrowserRouter([
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
       { path: "projects/:projectId/api-design", element: <ApiDesignPage />, handle: { title: "API design" } },
       { path: "projects/:projectId/tasks", element: <TasksPage />, handle: { title: "Development tasks" } },
       { path: "projects/:projectId/code", element: <CodePage />, handle: { title: "Code" } },
+      { path: "projects/:projectId/review", element: <ReviewPage />, handle: { title: "Code review" } },
       { path: "*", element: <NotFoundPage />, handle: { title: "Not found" } },
     ],
   },

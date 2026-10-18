@@ -296,6 +296,34 @@ whose dependencies are not done is refused (`409`), so its code always builds on
 | `code_changesets` | One AI proposal per task generation (pending, completed, discarded) |
 | `code_changes`    | File changes in a proposal with base content, new content, decision |
 
+**Tests** are a second kind of change set (`kind = TESTS`), generated for a task once its code is
+accepted and reviewed file by file like code. The model sees the files the task's accepted code
+wrote first. A test proposal may only create or update test files (files in test folders such as
+`src/test/`, `tests/`, `__tests__/`, or named like `*.test.ts`, `*Test.java`, `test_*.py`, plus test
+runner configuration) and update an existing build file to add a test dependency; anything else is
+dropped. ForgeAI writes the tests but does not run them.
+
+### Code review (`com.forgeai.review`)
+
+Reviews the accepted code against the approved requirements, architecture, data model and API, and
+common coding standards (correctness, security, design, testing, performance, maintainability).
+Needs the design approved and at least one accepted file.
+
+- **Context**: application code before tests, most recently changed first, with line numbers, up to
+  150 000 characters. Files that do not fit are listed as not shown, and the review records how
+  many files it covered. The backlog is included so work a task still to do will cover is not reported.
+- **Findings** are repaired before they are stored: a file must be one that was shown, a line must
+  exist in it, a requirement must be approved, unknown values fall back to defaults, duplicates and
+  findings without a title are dropped, at most 40, most severe (high, medium, low) first.
+- **Actions**: a finding becomes a backlog task (title, description with the suggested fix and
+  location, the finding's task type, linked to its requirement if still approved) or is dismissed
+  and can be reopened. A fingerprint of the code at review time tells when the code changed since.
+
+| Table             | Purpose                                                          |
+| ----------------- | ---------------------------------------------------------------- |
+| `code_reviews`    | One review: summary, model, files reviewed, code fingerprint     |
+| `review_findings` | Findings with severity, category, location, status, created task |
+
 ### Configuration
 
 All environment-specific values come from environment variables (see `.env.example`). The

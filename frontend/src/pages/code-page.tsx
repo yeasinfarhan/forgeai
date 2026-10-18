@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Code2, Download, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, Code2, Download, FlaskConical, Lock, Sparkles } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { ChangesetReview } from "@/components/code/changeset-review";
@@ -15,6 +15,7 @@ import {
   downloadBinary,
   errorMessage,
   generateCode,
+  generateTests,
   getChangeset,
   getCode,
   getProject,
@@ -40,7 +41,7 @@ export function CodePage() {
   const focusTask = searchParams.get("task");
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [changeset, setChangeset] = useState<Changeset | null>(null);
-  const [generating, setGenerating] = useState<CodeTaskItem | null>(null);
+  const [generating, setGenerating] = useState<{ task: CodeTaskItem; kind: "code" | "tests" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
@@ -50,8 +51,10 @@ export function CodePage() {
       .then(([project, overview]) => {
         setState({ kind: "loaded", project, overview });
         // Open the proposal waiting for review: the focused task's, or the newest one.
+        const focused = overview.tasks.find((t) => t.id === focusTask);
         const pending =
-          overview.tasks.find((t) => t.id === focusTask)?.pendingChangesetId ??
+          focused?.pendingChangesetId ??
+          focused?.pendingTestChangesetId ??
           overview.changesets.find((c) => c.status === "PENDING")?.id;
         if (pending) {
           getChangeset(projectId, pending, controller.signal)
@@ -93,11 +96,11 @@ export function CodePage() {
     }
   }
 
-  async function generate(task: CodeTaskItem) {
+  async function generate(task: CodeTaskItem, kind: "code" | "tests") {
     setError(null);
-    setGenerating(task);
+    setGenerating({ task, kind });
     try {
-      setChangeset(await generateCode(project.id, task.id));
+      setChangeset(await (kind === "code" ? generateCode(project.id, task.id) : generateTests(project.id, task.id)));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -183,7 +186,7 @@ export function CodePage() {
       {generating && (
         <div role="status" className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
           <span className="size-2 animate-pulse rounded-full bg-primary" />
-          Writing the code for {generating.code}…
+          Writing the {generating.kind} for {generating.task.code}…
           <span className="ml-auto text-xs text-muted-foreground">This can take a few minutes.</span>
         </div>
       )}
@@ -205,8 +208,9 @@ export function CodePage() {
           <div>
             <h2 className="font-semibold">Tasks</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              A task's code can be generated once the tasks it depends on are done. Generating again replaces a proposal
-              that is still waiting for review.
+              A task's code can be generated once the tasks it depends on are done, and its tests once its code is
+              accepted. Generating again replaces a proposal that is still waiting for review. ForgeAI writes the tests
+              but does not run them: run them in your project after downloading the code.
             </p>
           </div>
           <ol className="divide-y rounded-lg border">
@@ -226,18 +230,34 @@ export function CodePage() {
                 )}
                 {task.pendingChangesetId && (
                   <Button size="sm" variant="outline" onClick={() => open(task.pendingChangesetId!)}>
-                    Review
+                    Review code
                   </Button>
                 )}
                 <Button
                   size="sm"
-                  variant={task.pendingChangesetId ? "ghost" : "default"}
+                  variant={task.pendingChangesetId || task.hasCode ? "ghost" : "default"}
                   disabled={!overview.canGenerate || generating !== null || task.blockedBy.length > 0}
-                  onClick={() => generate(task)}
+                  onClick={() => generate(task, "code")}
                 >
                   <Sparkles />
-                  {task.pendingChangesetId ? "Regenerate" : "Generate code"}
+                  {task.pendingChangesetId || task.hasCode ? "Regenerate code" : "Generate code"}
                 </Button>
+                {task.pendingTestChangesetId && (
+                  <Button size="sm" variant="outline" onClick={() => open(task.pendingTestChangesetId!)}>
+                    Review tests
+                  </Button>
+                )}
+                {task.hasCode && (
+                  <Button
+                    size="sm"
+                    variant={task.pendingTestChangesetId ? "ghost" : "outline"}
+                    disabled={!overview.canGenerate || generating !== null}
+                    onClick={() => generate(task, "tests")}
+                  >
+                    <FlaskConical />
+                    {task.pendingTestChangesetId ? "Regenerate tests" : "Generate tests"}
+                  </Button>
+                )}
               </li>
             ))}
           </ol>
@@ -260,6 +280,7 @@ export function CodePage() {
                 >
                   <span className="font-mono text-xs text-muted-foreground">{c.taskCode}</span>
                   <span className="min-w-0 flex-1 truncate">{c.taskTitle}</span>
+                  {c.kind === "TESTS" && <Badge variant="outline">Tests</Badge>}
                   <span className="text-xs text-muted-foreground">
                     {c.accepted} accepted · {c.rejected} rejected{c.status === "PENDING" ? ` · ${c.pending} to review` : ""}
                   </span>

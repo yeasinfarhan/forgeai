@@ -19,6 +19,26 @@ class CodePathsTest {
     }
 
     @Test
+    void testFilesAndBuildFilesAreRecognised() {
+        assertThat(CodePaths.isTestFile("backend/src/test/java/com/acme/InvoiceService.java")).isTrue();
+        assertThat(CodePaths.isTestFile("backend/src/main/java/com/acme/InvoiceServiceTest.java")).isTrue();
+        assertThat(CodePaths.isTestFile("backend/src/main/java/com/acme/InvoiceApiIT.java")).isTrue();
+        assertThat(CodePaths.isTestFile("frontend/src/lib/api.test.ts")).isTrue();
+        assertThat(CodePaths.isTestFile("frontend/src/__tests__/App.tsx")).isTrue();
+        assertThat(CodePaths.isTestFile("web/app.spec.js")).isTrue();
+        assertThat(CodePaths.isTestFile("tests/conftest.py")).isTrue();
+        assertThat(CodePaths.isTestFile("api/test_invoices.py")).isTrue();
+        assertThat(CodePaths.isTestFile("store/store_test.go")).isTrue();
+        assertThat(CodePaths.isTestFile("frontend/vitest.config.ts")).isTrue();
+        assertThat(CodePaths.isTestFile("backend/src/main/java/com/acme/InvoiceService.java")).isFalse();
+        assertThat(CodePaths.isTestFile("docs/AUDIT.md")).isFalse();
+        assertThat(CodePaths.isTestFile("src/latest.ts")).isFalse();
+        assertThat(CodePaths.isBuildFile("backend/pom.xml")).isTrue();
+        assertThat(CodePaths.isBuildFile("frontend/package.json")).isTrue();
+        assertThat(CodePaths.isBuildFile("frontend/src/package.ts")).isFalse();
+    }
+
+    @Test
     void wrappingCodeFencesAreRemoved() {
         assertThat(CodeAssistant.stripFence("```java\nclass A {}\n```")).isEqualTo("class A {}\n");
         assertThat(CodeAssistant.stripFence("class A {}\n")).isEqualTo("class A {}\n");

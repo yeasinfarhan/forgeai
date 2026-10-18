@@ -11,11 +11,12 @@ Idea → Requirements → Architecture → Database Design → API Design
 Claude acts as the reasoning engine. The application itself owns everything around it: projects,
 persistent context, approvals, tasks, generated artifacts and the development workflow.
 
-> **Status: Phase 8 — Code generation.** Users register, manage projects, turn an idea into a
+> **Status: Phase 9 — Tests & code review.** Users register, manage projects, turn an idea into a
 > structured project brief, then generate, edit, review and approve requirements, an architecture,
 > a data model (ER diagram, SQL export) and an HTTP API (OpenAPI export), break the approved
-> design into an ordered backlog tracked on a board, and generate the code task by task — every
-> file reviewed as a diff before it is accepted, the result downloadable as a ZIP. Later stages are planned in
+> design into an ordered backlog tracked on a board, and generate the code and its tests task by
+> task — every file reviewed as a diff before it is accepted, the result downloadable as a ZIP —
+> then have the code reviewed and turn findings into tasks. Later stages are planned in
 > [`docs/development-plan.md`](docs/development-plan.md).
 
 ---
@@ -68,6 +69,7 @@ forgeai/
 │   │   ├── components/intake/   Idea intake panel, brief view
 │   │   ├── components/layout/   App shell: sidebar, header, layouts
 │   │   ├── components/requirements/ Requirement cards, form, summary card
+│   │   ├── components/review/   Code review summary card
 │   │   ├── components/tasks/    Task board, backlog order, task form and details
 │   │   ├── components/ui/       shadcn/ui components
 │   │   ├── hooks/               React hooks (API health polling)
@@ -282,11 +284,17 @@ curl http://localhost:8080/api/health
 | GET    | `/api/projects/{id}/code`                         | ✓ | Accepted files, tasks, change sets          |
 | GET    | `/api/projects/{id}/code/file?path=`              | ✓ | One accepted file                           |
 | POST   | `/api/projects/{id}/code/tasks/{tid}/generate`    | ✓ | Generate a change set for a task            |
+| POST   | `/api/projects/{id}/code/tasks/{tid}/tests`       | ✓ | Generate tests for a task's accepted code   |
 | GET    | `/api/projects/{id}/code/changesets/{cid}`        | ✓ | A change set with every file change         |
 | POST   | `/api/projects/{id}/code/changesets/{cid}/changes/{chid}/accept` | ✓ | Accept one file (`reject` likewise) |
 | POST   | `/api/projects/{id}/code/changesets/{cid}/accept-all` | ✓ | Accept every pending file at once       |
 | POST   | `/api/projects/{id}/code/changesets/{cid}/discard` | ✓ | Reject the rest and close the change set   |
 | GET    | `/api/projects/{id}/code/export.zip`              | ✓ | Accepted code as a ZIP (download)           |
+| GET    | `/api/projects/{id}/reviews`                      | ✓ | Reviews, latest with findings, blocker      |
+| POST   | `/api/projects/{id}/reviews/generate`             | ✓ | Review the accepted code                    |
+| GET    | `/api/projects/{id}/reviews/{rid}`                | ✓ | One review with its findings                |
+| POST   | `/api/projects/{id}/reviews/{rid}/findings/{fid}/task` | ✓ | Turn a finding into a backlog task     |
+| POST   | `/api/projects/{id}/reviews/{rid}/findings/{fid}/dismiss` | ✓ | Dismiss (`reopen` undoes it)        |
 
 Intake endpoints call Claude and can take up to a minute. AI failures return a problem detail with
 a `reason` (`NOT_CONFIGURED`, `RATE_LIMITED`, `TIMEOUT`, …) and a message safe to show users.

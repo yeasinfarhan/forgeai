@@ -93,13 +93,27 @@ public class TaskService {
     @Transactional
     public BacklogOverview create(UUID ownerId, UUID projectId, SaveTask request) {
         projects.get(ownerId, projectId);
+        add(projectId, request);
+        return overview(projectId);
+    }
+
+    /** A task created on a person's request from elsewhere (a code review finding). */
+    public record AddedTask(UUID id, String code) {
+    }
+
+    /**
+     * Adds a task at the end of the backlog, checked like a task written by hand. The caller must
+     * have checked that the project belongs to the user.
+     */
+    @Transactional
+    public AddedTask add(UUID projectId, SaveTask request) {
         List<Task> all = tasks.findAllByProjectIdOrderByPositionAscSeqNumberAsc(projectId);
         TaskContent content = TaskRules.tidy(request);
         check(content, null, all, inputs(projectId), null);
         Task task = tasks.saveAndFlush(new Task(projectId, tasks.maxSeqNumber(projectId) + 1, all.size(), TaskSource.USER,
                 content, write(content.details())));
         events.save(TaskEvent.of(task, TaskEventType.CREATED));
-        return overview(projectId);
+        return new AddedTask(task.getId(), task.code());
     }
 
     @Transactional
