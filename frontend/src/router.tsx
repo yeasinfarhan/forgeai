@@ -10,6 +10,7 @@ import { NotFoundPage } from "@/pages/not-found-page";
 import { ProjectDetailPage } from "@/pages/project-detail-page";
 import { ProjectsPage } from "@/pages/projects-page";
 import { RegisterPage } from "@/pages/register-page";
+import { RequirementsPage } from "@/pages/requirements-page";
 
 export const router = createBrowserRouter([
   {
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
       { path: "projects", element: <ProjectsPage />, handle: { title: "Projects" } },
       { path: "projects/new", element: <NewProjectPage />, handle: { title: "New project" } },
       { path: "projects/:projectId", element: <ProjectDetailPage />, handle: { title: "Project" } },
+      { path: "projects/:projectId/requirements", element: <RequirementsPage />, handle: { title: "Requirements" } },
       { path: "*", element: <NotFoundPage />, handle: { title: "Not found" } },
     ],
   },

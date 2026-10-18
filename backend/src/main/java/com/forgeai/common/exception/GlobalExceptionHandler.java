@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -76,6 +78,32 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
         problem.setTitle("Invalid credentials");
+        return problem;
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    ProblemDetail handleConflict(ConflictException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Conflict");
+        return problem;
+    }
+
+    /** Two requests changed the same row; the second one lost. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "This item was changed in another tab or window. Reload to see the latest version.");
+        problem.setTitle("Conflict");
+        return problem;
+    }
+
+    /** A database constraint rejected the change, typically two requests racing for the same unique value. */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "The change conflicts with existing data. Reload and try again.");
+        problem.setTitle("Conflict");
         return problem;
     }
 

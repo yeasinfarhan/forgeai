@@ -41,7 +41,7 @@ Delivered:
 - Frontend: auth pages, protected routes, project list and project detail shell.
 - Integration tests with Testcontainers PostgreSQL.
 
-## Phase 3 — AI module & idea intake
+## Phase 3 — AI module & idea intake ✅
 
 Goal: a reliable, isolated integration with Claude and the first pipeline stage.
 
@@ -58,12 +58,18 @@ Delivered:
 - Usage is logged per call (tokens, duration, attempts); persisting usage for cost reporting is
   left for Phase 11.
 
-## Phase 4 — Requirements
+## Phase 4 — Requirements ✅ (implemented)
 
-- Generate functional and non-functional requirements from the idea brief.
-- Requirements are stored as structured, individually editable items.
-- Approval workflow: draft → in review → approved. Later stages require approved input.
-- Version history so regenerated content never silently overwrites approved work.
+Delivered:
+
+- Generate functional and non-functional requirements from the brief (and intake Q&A) with a
+  JSON-schema structured output, validated in code.
+- Structured, individually editable items with category, acceptance criteria and priority; add
+  and delete by hand.
+- Approval workflow: draft → in review → approved, per item and in bulk; reopen to change.
+- Revision history per requirement; regeneration replaces only untouched AI drafts and keeps
+  approved, in-review, edited and hand-written requirements.
+- Optimistic locking so two tabs cannot silently overwrite each other.
 
 ## Phase 5 — Architecture
 

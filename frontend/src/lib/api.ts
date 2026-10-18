@@ -239,3 +239,107 @@ export function answerIntake(projectId: string, answers: IntakeAnswer[]): Promis
 export function writeIntakeBrief(projectId: string, answers: IntakeAnswer[] = []): Promise<Intake> {
   return apiRequest<Intake>(intakePath(projectId, "/brief"), { method: "POST", body: { answers } });
 }
+
+// --- Requirements ------------------------------------------------------------
+
+export type RequirementType = "FUNCTIONAL" | "NON_FUNCTIONAL";
+export type RequirementPriority = "MUST" | "SHOULD" | "COULD";
+export type RequirementStatus = "DRAFT" | "IN_REVIEW" | "APPROVED";
+
+export interface Requirement {
+  id: string;
+  code: string;
+  type: RequirementType;
+  category: string | null;
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  priority: RequirementPriority;
+  status: RequirementStatus;
+  source: "AI" | "USER";
+  edited: boolean;
+  version: number;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RequirementsOverview {
+  requirements: Requirement[];
+  counts: { draft: number; inReview: number; approved: number; total: number };
+  briefReady: boolean;
+  allApproved: boolean;
+}
+
+export interface RequirementRevision {
+  revision: number;
+  change: "CREATED" | "EDITED" | "STATUS_CHANGED";
+  category: string | null;
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  priority: RequirementPriority;
+  status: RequirementStatus;
+  createdAt: string;
+}
+
+export interface RequirementInput {
+  category: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  priority: RequirementPriority;
+}
+
+function requirementsPath(projectId: string, suffix = "") {
+  return `/api/projects/${encodeURIComponent(projectId)}/requirements${suffix}`;
+}
+
+export function getRequirements(projectId: string, signal?: AbortSignal): Promise<RequirementsOverview> {
+  return apiRequest<RequirementsOverview>(requirementsPath(projectId), { signal });
+}
+
+export function generateRequirements(projectId: string): Promise<RequirementsOverview> {
+  return apiRequest<RequirementsOverview>(requirementsPath(projectId, "/generate"), { method: "POST" });
+}
+
+export function createRequirement(projectId: string, type: RequirementType, input: RequirementInput): Promise<Requirement> {
+  return apiRequest<Requirement>(requirementsPath(projectId), { method: "POST", body: { type, ...input } });
+}
+
+export function updateRequirement(projectId: string, requirement: Requirement, input: RequirementInput): Promise<Requirement> {
+  return apiRequest<Requirement>(requirementsPath(projectId, `/${requirement.id}`), {
+    method: "PUT",
+    body: { ...input, version: requirement.version },
+  });
+}
+
+export function changeRequirementStatus(
+  projectId: string,
+  requirement: Requirement,
+  status: RequirementStatus,
+): Promise<Requirement> {
+  return apiRequest<Requirement>(requirementsPath(projectId, `/${requirement.id}/status`), {
+    method: "POST",
+    body: { status, version: requirement.version },
+  });
+}
+
+export function bulkChangeRequirementStatus(
+  projectId: string,
+  from: RequirementStatus,
+  to: RequirementStatus,
+): Promise<RequirementsOverview> {
+  return apiRequest<RequirementsOverview>(requirementsPath(projectId, "/bulk-status"), {
+    method: "POST",
+    body: { from, to },
+  });
+}
+
+export function deleteRequirement(projectId: string, requirementId: string): Promise<void> {
+  return apiRequest<void>(requirementsPath(projectId, `/${requirementId}`), { method: "DELETE" });
+}
+
+export function getRequirementHistory(projectId: string, requirementId: string): Promise<RequirementRevision[]> {
+  return apiRequest<RequirementRevision[]>(requirementsPath(projectId, `/${requirementId}/history`));
+}

@@ -148,6 +148,29 @@ brief, or restart with a new idea (replaces questions, answers and brief).
 The brief (`ProjectBrief`: title, summary, problem, target users, goals, core features, out of
 scope, constraints, open questions) is the input for the requirements phase.
 
+### Requirements (`com.forgeai.requirement`)
+
+Requirements are individual rows, numbered per type (`FR-001`, `NFR-001`) and never renumbered.
+Each has a category, title, description, acceptance criteria (one per line), MoSCoW priority,
+status, source (`AI` / `USER`), an `edited` flag and an optimistic-locking `version`.
+
+Workflow: `DRAFT → IN_REVIEW → APPROVED`; in review can go back to draft ("request changes"),
+approved can be reopened to draft. Approved requirements cannot be edited or deleted until
+reopened. Every create, edit and status change writes a full snapshot to
+`requirement_revisions`, so the history shows exactly what was approved.
+
+Regeneration never overwrites reviewed work: only untouched AI drafts are deleted. Everything
+else (in review, approved, edited, added by hand) is kept, passed to the AI as existing
+requirements so it does not duplicate them, and new items are numbered after the highest code.
+The AI call runs outside any transaction; the replace runs in a short one afterwards.
+
+| Table                   | Purpose                                                          |
+| ----------------------- | ---------------------------------------------------------------- |
+| `requirements`          | Current state of each requirement (unique per project/type/number) |
+| `requirement_revisions` | Snapshot per change (`CREATED`, `EDITED`, `STATUS_CHANGED`)      |
+
+Conflicts (stale `version`, editing approved items, generating without a brief) return `409`.
+
 ### Configuration
 
 All environment-specific values come from environment variables (see `.env.example`). The

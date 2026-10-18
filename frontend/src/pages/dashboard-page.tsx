@@ -13,7 +13,7 @@ import { formatRelative } from "@/lib/format";
 
 const PIPELINE_STAGES: { name: string; detail: string; available?: boolean }[] = [
   { name: "Idea", detail: "Describe the idea; Claude clarifies it and writes a brief", available: true },
-  { name: "Requirements", detail: "Functional and non-functional requirements" },
+  { name: "Requirements", detail: "Generate, review and approve requirements", available: true },
   { name: "Architecture", detail: "System components and their boundaries" },
   { name: "Database design", detail: "Entities, relations and migrations" },
   { name: "API design", detail: "Endpoints, contracts and error model" },
@@ -53,7 +53,7 @@ export function DashboardPage() {
         <CardHeader>
           <CardTitle>Delivery pipeline</CardTitle>
           <CardDescription>
-            The stages ForgeAI guides a project through. Idea intake is available on every project page.
+            The stages ForgeAI guides a project through. Available stages are reached from each project page.
           </CardDescription>
         </CardHeader>
         <CardContent>

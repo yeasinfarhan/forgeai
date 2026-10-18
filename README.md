@@ -11,8 +11,9 @@ Idea → Requirements → Architecture → Database Design → API Design
 Claude acts as the reasoning engine. The application itself owns everything around it: projects,
 persistent context, approvals, tasks, generated artifacts and the development workflow.
 
-> **Status: Phase 3 — AI idea intake.** Users register, manage projects, and turn an idea into a
-> structured project brief with Claude. Later stages are planned in
+> **Status: Phase 4 — Requirements.** Users register, manage projects, turn an idea into a
+> structured project brief, and generate, edit, review and approve requirements from it. Later
+> stages are planned in
 > [`docs/development-plan.md`](docs/development-plan.md).
 
 ---
@@ -42,6 +43,7 @@ forgeai/
 │   │   ├── health/              GET /api/health
 │   │   ├── intake/              Idea intake: questions, answers, project brief
 │   │   ├── project/             Project CRUD
+│   │   ├── requirement/         Requirements: generation, editing, review workflow, history
 │   │   └── user/                User entity and repository
 │   ├── src/main/resources/
 │   │   ├── application.yml
@@ -55,6 +57,7 @@ forgeai/
 │   │   ├── auth/                Session state, route guard
 │   │   ├── components/intake/   Idea intake panel, brief view
 │   │   ├── components/layout/   App shell: sidebar, header, layouts
+│   │   ├── components/requirements/ Requirement cards, form, summary card
 │   │   ├── components/ui/       shadcn/ui components
 │   │   ├── hooks/               React hooks (API health polling)
 │   │   ├── lib/                 API client and utilities
@@ -231,6 +234,14 @@ curl http://localhost:8080/api/health
 | POST   | `/api/projects/{id}/intake`         | ✓ | Start / restart with `{"idea": "…"}`           |
 | POST   | `/api/projects/{id}/intake/answers` | ✓ | Answer the current round of questions          |
 | POST   | `/api/projects/{id}/intake/brief`   | ✓ | Write (or rewrite) the brief now               |
+| GET    | `/api/projects/{id}/requirements`              | ✓ | All requirements with status counts         |
+| POST   | `/api/projects/{id}/requirements/generate`     | ✓ | Generate / regenerate drafts from the brief |
+| POST   | `/api/projects/{id}/requirements`              | ✓ | Add a requirement by hand → `201`           |
+| PUT    | `/api/projects/{id}/requirements/{rid}`        | ✓ | Edit (needs `version`; not when approved)   |
+| POST   | `/api/projects/{id}/requirements/{rid}/status` | ✓ | Move through draft → in review → approved   |
+| POST   | `/api/projects/{id}/requirements/bulk-status`  | ✓ | Move every requirement in one status        |
+| DELETE | `/api/projects/{id}/requirements/{rid}`        | ✓ | Delete (not when approved) → `204`          |
+| GET    | `/api/projects/{id}/requirements/{rid}/history`| ✓ | Revision history, newest first              |
 
 Intake endpoints call Claude and can take up to a minute. AI failures return a problem detail with
 a `reason` (`NOT_CONFIGURED`, `RATE_LIMITED`, `TIMEOUT`, …) and a message safe to show users.
